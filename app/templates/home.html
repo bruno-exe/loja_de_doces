@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Come Doce · Doces perto de você{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Feito para quem ama doces</span>
+    <h1>Um jeito simples de vender e comprar delícias.</h1>
+    <p class="lead">O Come Doce aproxima compradores e vendedores em um espaço fácil, organizado e gostoso de usar.</p>
+    <div class="hero-actions">
+      <a class="button" href="#proximas-etapas">Quero criar uma conta</a>
+      <a class="button button-secondary" href="#como-funciona">Conhecer o projeto</a>
+    </div>
+  </div>
+
+  <div class="sweet-card" aria-label="Ilustração de doces">
+    <span class="sweet-card-label">Hoje combina com</span>
+    <div class="candy" aria-hidden="true">🍰</div>
+    <h2>Algo feito com carinho</h2>
+    <p>Produtos, pedidos e informações reunidos em um só lugar.</p>
+  </div>
+</section>
+
+<section id="como-funciona" class="section">
+  <div class="section-heading">
+    <span class="eyebrow">Como vai funcionar</span>
+    <h2>Uma experiência para cada tipo de conta</h2>
+  </div>
+  <div class="account-grid">
+    <article class="account-card buyer-card">
+      <span class="card-icon" aria-hidden="true">🛍️</span>
+      <h3>Sou comprador</h3>
+      <p>Acompanhe suas compras e consulte as informações importantes da sua conta.</p>
+    </article>
+    <article class="account-card seller-card">
+      <span class="card-icon" aria-hidden="true">🧁</span>
+      <h3>Sou vendedor</h3>
+      <p>Tenha um perfil próprio e, nas próximas etapas, organize seus produtos.</p>
+    </article>
+  </div>
+</section>
+
+<section id="proximas-etapas" class="next-step">
+  <div>
+    <span class="eyebrow">Construção por etapas</span>
+    <h2>A página inicial está pronta.</h2>
+    <p>Cadastro e login serão adicionados na próxima etapa, depois da sua avaliação desta tela.</p>
+  </div>
+  <span class="status-pill">Etapa 1</span>
+</section>
+{% endblock %}
