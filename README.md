@@ -1,15 +1,4 @@
-<<<<<<< HEAD
 # Come Doce
-## Iniciar no Windows
-
-Abra `iniciar_site.cmd`. Na primeira execução, o arquivo cria um ambiente virtual e instala as dependências automaticamente.
-
-Depois, acesse:
-
-- site: http://127.0.0.1:8000
-- verificação técnica: http://127.0.0.1:8000/status
-
-# Loja de Doces
 
 ## Sobre o projeto
 
@@ -39,10 +28,21 @@ Facilitar o processo de venda, pagamento e entrega dos produtos, tornando o aten
 
 ## Integrantes
 
-- Bruno inácio de Jesus Araujo
-
+- Bruno Inácio de Jesus Araujo
 
 ## Projeto Integrador
 
-Projeto desenvolvido para projeto Integrador em Computação II.
->>>>>>> 2b8b95d2871aa14961005b39cd949a687a3ca068
+Projeto desenvolvido para o Projeto Integrador em Computação II.
+
+## Iniciar no Windows
+
+Abra `iniciar_site.cmd`.
+
+Na primeira execução, o arquivo cria um ambiente virtual e instala as dependências automaticamente.
+
+Depois, acesse:
+
+- Site: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Verificação técnica: [http://127.0.0.1:8000/status](http://127.0.0.1:8000/status)
+
+Para encerrar o site, pressione `Ctrl+C` na janela do servidor.

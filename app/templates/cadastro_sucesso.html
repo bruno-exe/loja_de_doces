@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Conta criada · Come Doce{% endblock %}
+{% block content %}
+<section class="success-page">
+  <div class="success-card">
+    <span class="success-icon" aria-hidden="true">✓</span>
+    <span class="eyebrow">Cadastro concluído</span>
+    <h1>Sua conta foi criada!</h1>
+    <p>Tipo de conta: <strong>{{ account_label }}</strong></p>
+    <p>Na próxima etapa, criaremos o login e o acesso ao seu perfil.</p>
+    <a class="button" href="/">Voltar para o início</a>
+  </div>
+</section>
+{% endblock %}

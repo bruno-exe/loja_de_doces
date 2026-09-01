@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Criar conta · Come Doce{% endblock %}
+{% block content %}
+<section class="form-page">
+  <div class="form-intro">
+    <a class="back-link" href="/">← Voltar para o início</a>
+    <span class="eyebrow">Faça parte do Come Doce</span>
+    <h1>Crie sua conta.</h1>
+    <p>Escolha como você usará o site. Depois, cada tipo de conta terá uma experiência própria.</p>
+  </div>
+
+  <div class="form-card">
+    {% if errors %}
+      <div class="form-errors" role="alert">
+        <strong>Confira os dados informados:</strong>
+        <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    <form method="post" action="/cadastro">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <fieldset class="account-choice">
+        <legend>Como você quer usar o Come Doce?</legend>
+        <div class="choice-grid">
+          <label class="choice-card">
+            <input type="radio" name="tipo_conta" value="comprador" required {% if form.tipo_conta == 'comprador' %}checked{% endif %}>
+            <span class="choice-content"><span class="choice-icon" aria-hidden="true">🛍️</span><strong>Comprador</strong><small>Quero encontrar e comprar doces.</small></span>
+          </label>
+          <label class="choice-card">
+            <input type="radio" name="tipo_conta" value="vendedor" required {% if form.tipo_conta == 'vendedor' %}checked{% endif %}>
+            <span class="choice-content"><span class="choice-icon" aria-hidden="true">🧁</span><strong>Vendedor</strong><small>Quero apresentar e vender meus doces.</small></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <label class="field-label">Nome
+        <input type="text" name="nome" required minlength="2" maxlength="100" autocomplete="name" value="{{ form.nome or '' }}" placeholder="Seu nome">
+      </label>
+      <label class="field-label">E-mail
+        <input type="email" name="email" required maxlength="320" autocomplete="email" value="{{ form.email or '' }}" placeholder="voce@exemplo.com">
+      </label>
+      <div class="field-pair">
+        <label class="field-label">Senha
+          <input type="password" name="senha" required minlength="8" maxlength="128" autocomplete="new-password">
+          <small>Use pelo menos 8 caracteres.</small>
+        </label>
+        <label class="field-label">Confirmar senha
+          <input type="password" name="confirmar_senha" required minlength="8" maxlength="128" autocomplete="new-password">
+        </label>
+      </div>
+      <button class="button submit-button" type="submit">Criar minha conta</button>
+    </form>
+    <p class="form-footer">Já possui uma conta? O login será criado na próxima etapa.</p>
+  </div>
+</section>
+{% endblock %}
