@@ -50,7 +50,7 @@ def registration_page(request: Request):
 def register(
     request: Request,
     nome: str = Form(...),
-    tipo_conta: str = Form(...),
+    tipo_conta: str = Form(""),
     email: str = Form(...),
     senha: str = Form(...),
     confirmar_senha: str = Form(...),

@@ -122,6 +122,15 @@ h1 {
   font-size: clamp(1.05rem, 2vw, 1.25rem);
 }
 
+.hero-feature-image {
+  display: block;
+  width: min(100%, 440px);
+  height: auto;
+  margin: 0 0 26px;
+  border-radius: 30px;
+  box-shadow: 0 18px 42px rgba(92, 48, 28, 0.16);
+}
+
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -296,11 +305,17 @@ h1 {
 .choice-card input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .choice-content { min-height: 150px; padding: 20px; display: flex; flex-direction: column; border: 2px solid var(--line); border-radius: 20px; background: var(--cream); transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
 .choice-content:hover { transform: translateY(-2px); }
-.choice-card input:checked + .choice-content { border-color: var(--caramel); background: #fff3e8; }
+.choice-card input:checked + .choice-content {
+  border-color: #b85a12;
+  background: #c96c15;
+  box-shadow: 0 8px 22px rgba(184, 90, 18, 0.22), inset 0 0 0 1px rgba(184, 90, 18, 0.12);
+}
 .choice-card input:focus-visible + .choice-content { outline: 3px solid rgba(217, 119, 42, 0.28); outline-offset: 2px; }
 .choice-icon { margin-bottom: 10px; font-size: 1.75rem; }
 .choice-content strong { font-size: 1.06rem; }
 .choice-content small { margin-top: 5px; color: var(--chocolate-soft); }
+.account-choice-warning { margin: 12px 0 0; padding: 11px 13px; color: #842b1d; border: 1px solid #e29b76; border-radius: 12px; background: #fff0e7; font-size: 0.92rem; font-weight: 750; }
+.account-choice-warning[hidden] { display: none; }
 
 .field-label { display: grid; gap: 7px; font-weight: 750; }
 .field-label input {
@@ -345,6 +360,7 @@ h1 {
   }
 
   h1 { font-size: clamp(3rem, 14vw, 4.6rem); }
+  .hero-feature-image { width: 100%; border-radius: 24px; }
   .hero-actions { display: grid; }
   .sweet-card { padding: 38px 28px; border-radius: 30px; transform: none; }
   .account-grid { grid-template-columns: 1fr; }

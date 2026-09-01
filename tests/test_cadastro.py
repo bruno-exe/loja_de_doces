@@ -24,6 +24,32 @@ def csrf_from(response) -> str:
     return match.group(1)
 
 
+def test_account_type_starts_unselected_and_is_required() -> None:
+    with TestClient(app) as client:
+        page = client.get("/cadastro")
+        account_fields = re.findall(r'<input[^>]+name="tipo_conta"[^>]*>', page.text)
+        assert len(account_fields) == 2
+        assert all("checked" not in field for field in account_fields)
+        assert "Criar conta vendedor" in page.text
+        assert "Criar conta comprador" in page.text
+        assert '>Criar minha conta</button>' in page.text
+
+        response = client.post(
+            "/cadastro",
+            data={
+                "csrf": csrf_from(page),
+                "nome": "Carlos Lima",
+                "email": "carlos@teste.com",
+                "senha": "senha-segura",
+                "confirmar_senha": "senha-segura",
+            },
+        )
+
+    assert response.status_code == 422
+    assert "Escolha uma conta de comprador ou vendedor." in response.text
+    assert "Escolha Comprador ou Vendedor para criar sua conta." in page.text
+
+
 def test_registers_buyer_with_hashed_password() -> None:
     with TestClient(app) as client:
         token = csrf_from(client.get("/cadastro"))

@@ -19,7 +19,7 @@
 
     <form method="post" action="/cadastro">
       <input type="hidden" name="csrf" value="{{ csrf_token }}">
-      <fieldset class="account-choice">
+      <fieldset class="account-choice" aria-describedby="accountChoiceWarning">
         <legend>Como você quer usar o Come Doce?</legend>
         <div class="choice-grid">
           <label class="choice-card">
@@ -31,6 +31,7 @@
             <span class="choice-content"><span class="choice-icon" aria-hidden="true">🧁</span><strong>Vendedor</strong><small>Quero apresentar e vender meus doces.</small></span>
           </label>
         </div>
+        <p id="accountChoiceWarning" class="account-choice-warning" role="alert" hidden>Escolha Comprador ou Vendedor para criar sua conta.</p>
       </fieldset>
 
       <label class="field-label">Nome
@@ -48,9 +49,44 @@
           <input type="password" name="confirmar_senha" required minlength="8" maxlength="128" autocomplete="new-password">
         </label>
       </div>
-      <button class="button submit-button" type="submit">Criar minha conta</button>
+      <button id="createAccountButton" class="button submit-button" type="submit">Criar minha conta</button>
     </form>
     <p class="form-footer">Já possui uma conta? O login será criado na próxima etapa.</p>
   </div>
 </section>
+<script>
+  const registrationForm = document.querySelector('.form-card form');
+  const accountInputs = document.querySelectorAll('input[name="tipo_conta"]');
+  const accountWarning = document.querySelector('#accountChoiceWarning');
+  const createAccountButton = document.querySelector('#createAccountButton');
+
+  function hasSelectedAccountType() {
+    return Array.from(accountInputs).some((input) => input.checked);
+  }
+
+  function updateCreateAccountButton() {
+    const selectedAccount = Array.from(accountInputs).find((input) => input.checked);
+    if (!selectedAccount) {
+      createAccountButton.textContent = 'Criar minha conta';
+      return;
+    }
+    createAccountButton.textContent = selectedAccount.value === 'vendedor'
+      ? 'Criar conta vendedor'
+      : 'Criar conta comprador';
+  }
+
+  registrationForm.addEventListener('submit', (event) => {
+    if (hasSelectedAccountType()) return;
+    event.preventDefault();
+    accountWarning.hidden = false;
+    accountInputs[0].focus();
+  });
+
+  accountInputs.forEach((input) => input.addEventListener('change', () => {
+    accountWarning.hidden = true;
+    updateCreateAccountButton();
+  }));
+
+  updateCreateAccountButton();
+</script>
 {% endblock %}
