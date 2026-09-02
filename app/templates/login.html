@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Entrar · Come Doce{% endblock %}
+{% block content %}
+<section class="form-page login-page">
+  <div class="form-intro">
+    <a class="back-link" href="/">← Voltar para o início</a>
+    <span class="eyebrow">Que bom ter você de volta</span>
+    <h1>Entre na sua conta.</h1>
+    <p>Use o mesmo e-mail e a senha informados no cadastro.</p>
+  </div>
+
+  <div class="form-card">
+    {% if errors %}
+      <div class="form-errors" role="alert">
+        <strong>Não foi possível entrar:</strong>
+        <ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label class="field-label">E-mail
+        <input type="email" name="email" required maxlength="320" autocomplete="email" value="{{ form.email or '' }}" placeholder="voce@exemplo.com" autofocus>
+      </label>
+      <label class="field-label">Senha
+        <input type="password" name="senha" required maxlength="128" autocomplete="current-password">
+      </label>
+      <button class="button submit-button" type="submit">Entrar</button>
+    </form>
+    <p class="form-footer">Ainda não tem uma conta? <a href="/cadastro">Criar conta</a></p>
+  </div>
+</section>
+{% endblock %}

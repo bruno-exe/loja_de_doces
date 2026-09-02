@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Vendas · Come Doce{% endblock %}
+{% block content %}
+<section class="sales-page">
+  <header class="sales-heading"><span class="eyebrow">Área do vendedor</span><h1>Vendas</h1><p>Veja quem comprou seus doces e acompanhe o histórico de cada cliente.</p></header>
+  {% if clientes %}
+    <div class="sales-customer-list">
+      {% for cliente in clientes %}
+        <a class="sales-customer-card" href="/vendas/clientes/{{ cliente.id }}">
+          {% if cliente.foto %}<img src="/uploads/profile_photos/{{ cliente.foto }}" alt="Foto de {{ cliente.nome }}">{% else %}<span class="sales-customer-placeholder" aria-hidden="true">{{ cliente.nome[:1] | upper }}</span>{% endif %}
+          <div class="sales-customer-summary">
+            <strong>{{ cliente.nome }}</strong>
+            <span>{{ cliente.comprados }} {{ 'doce comprado' if cliente.comprados == 1 else 'doces comprados' }}</span>
+            <span>{{ cliente.pagos }} {{ 'doce pago' if cliente.pagos == 1 else 'doces pagos' }}</span>
+            <small>Doce mais comprado: <b>{{ cliente.mais_comprado }}</b></small>
+          </div>
+          <span class="purchase-card-arrow" aria-hidden="true">›</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="purchases-empty"><span aria-hidden="true">📊</span><h2>Nenhuma venda ainda</h2><p>Os compradores aparecerão aqui quando fizerem o primeiro pedido.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

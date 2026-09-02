@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Meu perfil de vendedor · Come Doce{% endblock %}
+{% block content %}
+<section class="profile-page">
+  <header class="profile-heading">
+    {% if usuario.foto %}<img class="profile-avatar profile-avatar-photo" src="/uploads/profile_photos/{{ usuario.foto }}" alt="Imagem dos doces de {{ usuario.nome }}">{% else %}<div class="profile-avatar seller-avatar" aria-hidden="true">{{ usuario.nome[:1] | upper }}</div>{% endif %}
+    <div>
+      <span class="account-badge seller-badge">Vendedor</span>
+      <h1>{{ usuario.nome }}</h1>
+      <p class="profile-email-line">{{ usuario.email }} <a href="/conta/editar">Editar conta</a></p>
+    </div>
+  </header>
+
+  <div class="profile-panel">
+    <div class="panel-heading">
+      <div><span class="eyebrow">Minha vitrine</span><h2>Perfil do vendedor</h2></div>
+      <a class="button button-small" href="/produtos/novo">Criar produto</a>
+    </div>
+    <div class="seller-presentation">
+      <h3>Frase de apresentação</h3>
+      <p>{{ perfil.frase_apresentacao if perfil and perfil.frase_apresentacao else 'Sua frase de apresentação poderá ser adicionada em uma próxima etapa.' }}</p>
+    </div>
+    <div class="seller-visit-counter"><span>Visitas nas últimas 24 horas</span><strong>{{ visitas_24h }}</strong></div>
+    <div class="seller-pix-summary">
+      <div><span>Chave Pix para receber pagamentos</span><strong>{{ perfil.chave_pix if perfil and perfil.chave_pix else 'Nenhuma chave cadastrada' }}</strong></div>
+      <a href="/conta/editar#chave-pix">{{ 'Editar' if perfil and perfil.chave_pix else 'Adicionar' }}</a>
+    </div>
+    <div class="empty-note seller-product-count">
+      <span>{{ quantidade_produtos }} {{ 'produto cadastrado' if quantidade_produtos == 1 else 'produtos cadastrados' }}</span>
+      <a class="button button-small" href="/produtos/novo">Ver</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

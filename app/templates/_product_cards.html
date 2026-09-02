@@ -1,0 +1,23 @@
+<div class="seller-products-grid">
+  {% for doce in doces %}
+    <article class="product-card">
+      {% if can_delete_products %}
+        <form class="delete-product-form" method="post" action="/produtos/{{ doce.id }}/excluir">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button type="submit">Excluir produto</button>
+        </form>
+      {% endif %}
+      <img class="product-card-image" src="/uploads/products/{{ doce.imagem }}" alt="{{ doce.nome }}">
+      <div class="product-card-content">
+        <h3>{{ doce.nome }}</h3>
+        <p>{{ doce.descricao }}</p>
+        <strong class="product-price">{{ doce.valor }}</strong>
+        <div class="product-options">
+          {% if doce.aceita_fiado %}<span>Aceita venda fiada</span>{% endif %}
+          {% if doce.com_entrega %}<span>Com entrega</span>{% endif %}
+        </div>
+        {% if can_buy_products %}<button class="button product-buy-button" type="button" data-buy-product data-product-id="{{ doce.id }}" data-product-name="{{ doce.nome }}" data-accepts-credit="{{ 'true' if doce.aceita_fiado else 'false' }}" data-has-delivery="{{ 'true' if doce.com_entrega else 'false' }}">Comprar</button>{% endif %}
+      </div>
+    </article>
+  {% endfor %}
+</div>

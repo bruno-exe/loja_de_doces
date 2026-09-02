@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Compras de {{ vendedor.nome }} · Come Doce{% endblock %}
+{% block content %}
+<section class="purchases-page">
+  <a class="back-link" href="/minhas-compras">← Voltar para Minhas compras</a>
+  <header class="purchase-history-seller">
+    {% if vendedor.foto %}<img src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem de {{ vendedor.nome }}">{% else %}<span class="purchase-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</span>{% endif %}
+    <div><span class="eyebrow">Compras feitas com</span><h1>{{ vendedor.nome }}</h1></div>
+  </header>
+  <div class="purchased-products-list">
+    {% for pedido in pedidos %}
+      <article class="purchased-product-card">
+        {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% else %}<span class="purchased-product-placeholder" aria-hidden="true">🧁</span>{% endif %}
+        <div class="purchased-product-info"><strong>{{ pedido.nome }}</strong><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }}</span></div>
+        <div class="purchased-product-payment"><span class="payment-status {{ 'is-paid' if pedido.pago else 'is-pending' }}">{{ pedido.situacao }}</span>{% if not pedido.pago %}<a class="button button-small" href="/pagamentos/pedidos/{{ pedido.id }}">Pagar</a>{% endif %}</div>
+      </article>
+    {% endfor %}
+  </div>
+  <p class="payment-coming-note">Por enquanto, o pagamento é feito diretamente pela chave Pix informada pelo vendedor.</p>
+</section>
+{% endblock %}

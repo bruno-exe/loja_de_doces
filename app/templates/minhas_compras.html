@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Minhas compras · Come Doce{% endblock %}
+{% block content %}
+<section class="purchases-page">
+  <header class="purchases-heading"><span class="eyebrow">Seus pedidos</span><h1>Minhas compras</h1><p>Escolha um vendedor para visualizar os doces comprados.</p></header>
+  {% if vendedores %}
+    <div class="purchase-sellers-list">
+      {% for vendedor in vendedores %}
+        <a class="purchase-seller-card" href="/minhas-compras/vendedores/{{ vendedor.id }}">
+          {% if vendedor.foto %}<img src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem de {{ vendedor.nome }}">{% else %}<span class="purchase-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</span>{% endif %}
+          <span class="purchase-seller-info"><strong>{{ vendedor.nome }}</strong><small>{{ vendedor.quantidade }} {{ 'item comprado' if vendedor.quantidade == 1 else 'itens comprados' }}</small></span>
+          <span class="purchase-card-arrow" aria-hidden="true">›</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="purchases-empty"><span aria-hidden="true">🛒</span><h2>Nenhuma compra ainda</h2><p>Quando você comprar um doce, o vendedor aparecerá aqui.</p><a class="button" href="/doces">Ver doces</a></div>
+  {% endif %}
+</section>
+{% endblock %}

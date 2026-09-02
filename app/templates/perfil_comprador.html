@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Meu perfil · Come Doce{% endblock %}
+{% block content %}
+<section class="profile-page">
+  <header class="profile-heading">
+    {% if usuario.foto %}<img class="profile-avatar profile-avatar-photo" src="/uploads/profile_photos/{{ usuario.foto }}" alt="Foto de perfil de {{ usuario.nome }}">{% else %}<div class="profile-avatar" aria-hidden="true">{{ usuario.nome[:1] | upper }}</div>{% endif %}
+    <div>
+      <span class="account-badge buyer-badge">Comprador</span>
+      <h1>{{ usuario.nome }}</h1>
+      <p class="profile-email-line">{{ usuario.email }} <a href="/conta/editar">Editar conta</a></p>
+    </div>
+  </header>
+
+  <div class="profile-panel">
+    <div class="panel-heading"><div><span class="eyebrow">Minha conta</span><h2>Resumo do comprador</h2></div></div>
+    <div class="summary-grid">
+      <article><strong>0</strong><span>Doces comprados</span></article>
+      <article><strong>R$ 0,00</strong><span>Valor pendente</span></article>
+    </div>
+    <p class="empty-note">O histórico de compras será colocado no futuro</p>
+  </div>
+</section>
+{% endblock %}

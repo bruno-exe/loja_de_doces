@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Criar produto · Come Doce{% endblock %}
+{% block content %}
+<section class="new-product-page">
+  <header class="new-product-heading">
+    <a class="back-link" href="/perfil">← Voltar ao perfil</a>
+    <span class="eyebrow">Minha vitrine</span>
+    <h1>Criar produto</h1>
+    <p>Adicione as informações do doce que aparecerá na sua página de vendedor.</p>
+  </header>
+
+  {% if request.query_params.get('criado') %}<div class="product-created-success" role="status"><strong>Produto criado com sucesso!</strong> O formulário está pronto para cadastrar outro produto.</div>{% endif %}
+  {% if request.query_params.get('excluido') %}<div class="product-created-success" role="status"><strong>Produto excluído com sucesso!</strong></div>{% endif %}
+  {% if errors %}<div class="form-errors" role="alert"><strong>Não foi possível criar o produto:</strong><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+
+  <form id="newProductForm" class="new-product-form" method="post" action="/produtos/novo" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input id="productFocusX" type="hidden" name="focus_x">
+    <input id="productFocusY" type="hidden" name="focus_y">
+
+    <div class="product-form-fields">
+      <label class="field-label">Nome do doce
+        <input name="nome" required minlength="2" maxlength="120" value="{{ form.nome or '' }}" placeholder="Ex.: Brigadeiro tradicional">
+      </label>
+      <label class="field-label">Descrição
+        <textarea name="descricao" required minlength="2" maxlength="1000" rows="5" placeholder="Ingredientes, tamanho e outras informações importantes.">{{ form.descricao or '' }}</textarea>
+      </label>
+      <label class="field-label">Valor
+        <input name="valor" required inputmode="decimal" maxlength="20" value="{{ form.valor or '' }}" placeholder="Ex.: 5,00">
+      </label>
+      <label class="product-checkbox"><input type="checkbox" name="aceita_fiado" {% if form.aceita_fiado %}checked{% endif %}><span>Aceita venda fiada</span></label>
+      <label class="product-checkbox"><input type="checkbox" name="com_entrega" {% if form.com_entrega %}checked{% endif %}><span>Com entrega</span></label>
+    </div>
+
+    <div class="product-image-editor">
+      <h2>Imagem do produto</h2>
+      <p>Escolha uma imagem ou use a câmera. Você pode definir qual parte ficará no centro.</p>
+      <input id="productImageFile" class="visually-hidden-file" type="file" name="imagem" accept="image/jpeg,image/png,image/webp" required>
+      <div class="photo-source-actions">
+        <label class="button button-secondary" for="productImageFile">Escolher imagem</label>
+        <button id="openProductCamera" class="button button-secondary" type="button">Capturar com a câmera</button>
+      </div>
+      <div id="productPreviewArea" class="photo-preview-area" hidden>
+        <p id="productFocusInstruction" class="face-instruction">A imagem será centralizada automaticamente.</p>
+        <div id="productPreviewWrap" class="photo-preview-wrap">
+          <img id="productImagePreview" alt="Prévia da imagem do produto">
+          <span id="productFocusMarker" class="face-point-marker" hidden></span>
+        </div>
+        <div class="face-mode-actions">
+          <button id="centerProductImage" class="face-mode-button active" type="button">Centralizar imagem</button>
+          <button id="defineProductFocus" class="face-mode-button" type="button">Definir foco</button>
+        </div>
+      </div>
+      <p id="productImageStatus" class="photo-status">JPG, PNG ou WebP. Máximo de 5 MB.</p>
+    </div>
+
+    <button class="button product-create-button" type="submit">Criar produto</button>
+  </form>
+
+  <section class="created-products-section">
+    <div><span class="eyebrow">Já cadastrados</span><h2>Meus produtos</h2></div>
+    {% if produtos %}{% set doces = produtos %}{% set can_delete_products = true %}{% include "_product_cards.html" %}{% else %}<div class="seller-products-empty"><span aria-hidden="true">🧁</span><h3>Nenhum produto criado</h3><p>O primeiro produto aparecerá aqui depois do cadastro.</p></div>{% endif %}
+  </section>
+</section>
+
+<dialog id="productCameraDialog" class="camera-dialog">
+  <video id="productCameraVideo" autoplay playsinline muted></video>
+  <canvas id="productCameraCanvas" hidden></canvas>
+  <div class="camera-dialog-actions"><button id="takeProductPhoto" class="button" type="button">Fotografar</button><button id="closeProductCamera" class="button button-secondary" type="button">Cancelar</button></div>
+</dialog>
+<script src="/static/js/product_photo.js?v=20260901-1"></script>
+{% endblock %}

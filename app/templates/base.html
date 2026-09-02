@@ -5,24 +5,54 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Come Doce: um espaço para compradores e vendedores de doces.">
   <title>{% block title %}Come Doce{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260902-ocr1">
 </head>
-<body>
-  <header class="site-header">
+<body{% if usuario %} class="authenticated-page"{% endif %}>
+  <header class="site-header{% if usuario %} authenticated-header{% endif %}">
+    {% if usuario %}
+      <button class="side-menu-button" type="button" aria-label="Abrir menu" aria-controls="sideMenu" aria-expanded="false">&#9776;</button>
+    {% endif %}
     <a class="brand" href="/" aria-label="Página inicial do Come Doce">
       <span class="brand-mark" aria-hidden="true">C</span>
       <span>Come <strong>Doce</strong></span>
     </a>
-    <nav aria-label="Navegação principal">
-      <a href="/#como-funciona">Como funciona</a>
-      <a class="button button-small" href="/cadastro">Criar conta</a>
-    </nav>
+    {% if usuario %}
+      <span class="header-spacer"></span>
+      <form class="logout-form header-logout" method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <button class="nav-logout" type="submit">Sair</button>
+      </form>
+    {% else %}
+      <nav aria-label="Navegação principal">
+        <a href="/#como-funciona">Como funciona</a>
+        <a href="/login">Entrar</a>
+        <a class="button button-small" href="/cadastro">Criar conta</a>
+      </nav>
+    {% endif %}
   </header>
+
+  {% if usuario %}
+    <div class="side-menu-overlay" data-side-menu-close hidden></div>
+    <nav id="sideMenu" class="side-menu" aria-label="Menu da conta" aria-hidden="true">
+      <button class="side-menu-close" type="button" aria-label="Fechar menu" data-side-menu-close>&times;</button>
+      <div class="side-menu-identity">
+        <span>{{ usuario.nome[:1] | upper }}</span>
+        <div><strong>{{ usuario.nome }}</strong><small>{{ 'Vendedor' if usuario.tipo_conta == 'vendedor' else 'Comprador' }}</small></div>
+      </div>
+      <div class="side-menu-links">
+        <a href="/perfil" {% if request.url.path == '/perfil' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128100;</span> Meu perfil</a>
+        <a href="/doces" {% if request.url.path == '/doces' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#129473;</span> Doces</a>
+        <a href="/minhas-compras" {% if request.url.path.startswith('/minhas-compras') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Minhas compras</a>
+        {% if usuario.tipo_conta == 'vendedor' %}<a href="/vendas" {% if request.url.path.startswith('/vendas') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128200;</span> Vendas</a>{% endif %}
+      </div>
+    </nav>
+  {% endif %}
 
   <main>{% block content %}{% endblock %}</main>
 
   <footer class="site-footer">
-    <p>&copy; 2026 Come Doce. Ambiente local de desenvolvimento.</p>
+    <p>&copy; 2026 Come Doce. TI eng. computação.</p>
   </footer>
+  {% if usuario %}<script src="/static/js/side_menu.js?v=20260901-1"></script>{% endif %}
 </body>
 </html>

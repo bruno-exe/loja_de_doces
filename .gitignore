@@ -4,4 +4,7 @@ __pycache__/
 .pytest_cache/
 .env
 *.db
+app/uploads/profile_photos/*
+app/uploads/products/*
+app/private/payment_receipts/*
 plano/

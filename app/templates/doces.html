@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Doces · Come Doce{% endblock %}
+{% block content %}
+<section class="sweets-page">
+  <header class="sweets-heading">
+    <span class="eyebrow">Conheça quem faz</span>
+    <h1>Doces</h1>
+    <p>Encontre vendedores, conheça suas apresentações e descubra de quem será o seu próximo doce.</p>
+  </header>
+
+  {% if vendedores %}
+    <div class="seller-card-grid">
+      {% for vendedor in vendedores %}
+        <a class="seller-showcase-card" href="/vendedores/{{ vendedor.id }}" aria-label="Abrir página de {{ vendedor.nome }}">
+          {% if vendedor.foto %}
+            <img class="seller-card-photo" src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem dos doces de {{ vendedor.nome }}">
+          {% else %}
+            <div class="seller-card-photo seller-card-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</div>
+          {% endif %}
+          <div class="seller-card-content">
+            <span class="seller-card-label">Vendedor</span>
+            <h2>{{ vendedor.nome }}</h2>
+            <span class="seller-card-product-count">{{ vendedor.quantidade_doces }} {{ 'doce cadastrado' if vendedor.quantidade_doces == 1 else 'doces cadastrados' }}</span>
+            <p>{{ vendedor.frase if vendedor.frase else 'Este vendedor ainda não adicionou uma frase de apresentação.' }}</p>
+          </div>
+          <span class="seller-card-open">Ver doces <span aria-hidden="true">→</span></span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sweets-empty-state">
+      <span aria-hidden="true">🧁</span>
+      <h2>Nenhum vendedor disponível</h2>
+      <p>Os cartões dos vendedores aparecerão aqui quando houver contas ativas.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Editar conta · Come Doce{% endblock %}
+{% block content %}
+<section class="account-edit-page">
+  <div class="account-edit-heading">
+    <a class="back-link" href="/perfil">← Voltar ao perfil</a>
+    <span class="eyebrow">Configurações da conta</span>
+    <h1>Editar conta</h1>
+    {% if usuario.tipo_conta == 'vendedor' %}<p>Escolha uma imagem dos seus doces para representar sua vitrine. Outras opções serão adicionadas durante o desenvolvimento.</p>{% else %}<p>Por enquanto, você pode definir sua foto de perfil. Outras opções serão adicionadas durante o desenvolvimento.</p>{% endif %}
+  </div>
+
+  {% set photo_error = request.query_params.get('erro_foto') %}
+  {% if photo_error %}
+    <div class="form-errors account-photo-alert" role="alert">
+      {% if photo_error == 'tipo' %}Use uma imagem JPG, PNG ou WebP.
+      {% elif photo_error == 'tamanho' %}A imagem deve ter no máximo 5 MB.
+      {% elif photo_error == 'rosto' %}{% if usuario.tipo_conta == 'vendedor' %}Não foi possível enquadrar a imagem. Escolha novamente e use “Definir foco”.{% else %}Nenhum rosto foi detectado. Escolha a foto novamente, clique em “Escolher rosto” e toque no rosto da pessoa.{% endif %}
+      {% elif photo_error == 'coordenada' %}O ponto selecionado na imagem é inválido. Escolha o rosto novamente.
+      {% else %}Não foi possível processar essa imagem. Tente outra foto.{% endif %}
+    </div>
+  {% endif %}
+  {% if request.query_params.get('foto_removida') %}<div class="account-photo-success">Foto removida.</div>{% endif %}
+
+  <div class="account-photo-panel">
+    <div class="current-photo-block">
+      {% if usuario.foto %}
+        <img class="current-profile-photo" src="/uploads/profile_photos/{{ usuario.foto }}" alt="Foto atual">
+        <form method="post" action="/conta/foto/remover">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="remove-photo-button" type="submit">Remover foto</button>
+        </form>
+      {% else %}
+        <div class="current-profile-photo current-photo-placeholder">{{ usuario.nome[:1] | upper }}</div>
+      {% endif %}
+      <small>{{ 'Imagem atual dos doces' if usuario.tipo_conta == 'vendedor' else 'Foto atual' }}</small>
+    </div>
+
+    <form id="profilePhotoForm" class="photo-upload-form" method="post" action="/conta/foto" enctype="multipart/form-data" data-photo-mode="{{ 'seller' if usuario.tipo_conta == 'vendedor' else 'buyer' }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <input id="faceX" type="hidden" name="face_x">
+      <input id="faceY" type="hidden" name="face_y">
+      <input id="profilePhotoFile" class="visually-hidden-file" type="file" name="foto" accept="image/jpeg,image/png,image/webp" required>
+
+      <div class="photo-source-actions">
+        <label class="button button-secondary" for="profilePhotoFile">Escolher foto</label>
+        <button id="openProfileCamera" class="button button-secondary" type="button">Capturar foto</button>
+      </div>
+
+      <div id="photoPreviewArea" class="photo-preview-area" hidden>
+        <p id="faceInstruction" class="face-instruction">{% if usuario.tipo_conta == 'vendedor' %}A imagem será centralizada automaticamente.{% else %}A detecção automática escolherá o maior rosto da foto.{% endif %}</p>
+        <div id="photoPreviewWrap" class="photo-preview-wrap">
+          <img id="profilePhotoPreview" alt="Prévia da foto selecionada">
+          <span id="facePointMarker" class="face-point-marker" hidden></span>
+        </div>
+        <div class="face-mode-actions">
+          <button id="automaticFace" class="face-mode-button active" type="button">{{ 'Centralizar imagem' if usuario.tipo_conta == 'vendedor' else 'Detectar automaticamente' }}</button>
+          <button id="chooseFace" class="face-mode-button" type="button">{{ 'Definir foco' if usuario.tipo_conta == 'vendedor' else 'Escolher rosto' }}</button>
+        </div>
+      </div>
+
+      <p id="photoStatus" class="photo-status">JPG, PNG ou WebP. Máximo de 5 MB.</p>
+      <button class="button submit-button" type="submit">{{ 'Salvar imagem dos doces' if usuario.tipo_conta == 'vendedor' else 'Salvar foto de perfil' }}</button>
+    </form>
+  </div>
+
+  {% if usuario.tipo_conta == 'vendedor' %}
+    <section class="seller-presentation-editor">
+      <div>
+        <span class="eyebrow">Perfil do vendedor</span>
+        <h2>Frase de apresentação</h2>
+        <p>Escreva uma frase curta para apresentar seu trabalho aos compradores.</p>
+      </div>
+      {% if request.query_params.get('erro_apresentacao') == 'tamanho' %}<div class="form-errors" role="alert">A frase deve ter no máximo 240 caracteres.</div>{% endif %}
+      {% if request.query_params.get('apresentacao_salva') %}<div class="account-photo-success">Frase de apresentação salva.</div>{% endif %}
+      <form method="post" action="/conta/apresentacao">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <label class="field-label" for="sellerPresentation">Apresentação
+          <textarea id="sellerPresentation" name="frase_apresentacao" maxlength="240" rows="4" placeholder="Ex.: Doces artesanais feitos com carinho para deixar seu dia mais gostoso.">{{ perfil_vendedor.frase_apresentacao if perfil_vendedor and perfil_vendedor.frase_apresentacao else '' }}</textarea>
+        </label>
+        <div class="presentation-form-footer">
+          <small><span id="presentationCount">0</span>/240 caracteres</small>
+          <button class="button" type="submit">Salvar apresentação</button>
+        </div>
+      </form>
+    </section>
+    <section id="chave-pix" class="seller-presentation-editor">
+      <div><span class="eyebrow">Recebimentos</span><h2>Chave Pix</h2><p>Esta chave será exibida ao comprador na página de pagamento.</p></div>
+      {% if request.query_params.get('erro_pix') %}<div class="form-errors" role="alert">A chave Pix deve ter no máximo 140 caracteres.</div>{% endif %}
+      {% if request.query_params.get('pix_salva') %}<div class="account-photo-success">Chave Pix salva.</div>{% endif %}
+      <form method="post" action="/conta/pix">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <label class="field-label">Chave Pix para receber pagamentos<input name="chave_pix" maxlength="140" value="{{ perfil_vendedor.chave_pix if perfil_vendedor and perfil_vendedor.chave_pix else '' }}" placeholder="CPF, e-mail, telefone ou chave aleatória"></label>
+        <label class="field-label">Nome real do recebedor<input name="nome_recebedor_pix" maxlength="140" value="{{ perfil_vendedor.nome_recebedor_pix if perfil_vendedor and perfil_vendedor.nome_recebedor_pix else '' }}" placeholder="Nome que aparece no comprovante Pix"></label>
+        <button class="button" type="submit">Salvar chave Pix</button>
+      </form>
+    </section>
+    <script>
+      const sellerPresentation = document.querySelector('#sellerPresentation');
+      const presentationCount = document.querySelector('#presentationCount');
+      function updatePresentationCount() { presentationCount.textContent = sellerPresentation.value.length; }
+      sellerPresentation.addEventListener('input', updatePresentationCount);
+      updatePresentationCount();
+    </script>
+  {% endif %}
+</section>
+
+<dialog id="profileCameraDialog" class="camera-dialog">
+  <video id="profileCameraVideo" autoplay playsinline muted></video>
+  <canvas id="profileCameraCanvas" hidden></canvas>
+  <div class="camera-dialog-actions">
+    <button id="takeProfilePhoto" class="button" type="button">Fotografar</button>
+    <button id="closeProfileCamera" class="button button-secondary" type="button">Cancelar</button>
+  </div>
+</dialog>
+<script src="/static/js/profile_photo.js?v=20260901-2"></script>
+{% endblock %}

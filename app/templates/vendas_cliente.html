@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Vendas para {{ cliente.nome }} · Come Doce{% endblock %}
+{% block content %}
+<section class="sales-page">
+  <a class="back-link" href="/vendas">← Voltar para Vendas</a>
+  <header class="sales-customer-header">
+    {% if cliente.foto %}<img src="/uploads/profile_photos/{{ cliente.foto }}" alt="Foto de {{ cliente.nome }}">{% else %}<span class="sales-customer-placeholder" aria-hidden="true">{{ cliente.nome[:1] | upper }}</span>{% endif %}
+    <div><span class="eyebrow">Histórico do cliente</span><h1>{{ cliente.nome }}</h1></div>
+  </header>
+
+  <div class="sales-estimates-grid">
+    <article><span>Doce mais comprado</span><strong>{{ estimativas.mais_comprado }}</strong></article>
+    <article><span>Dia em que mais pede</span><strong>{{ estimativas.dia_preferido }}</strong></article>
+    <article><span>Preferência de recebimento</span><strong>{{ estimativas.entrega_preferida }}</strong></article>
+    <article><span>Preferência de pagamento</span><strong>{{ estimativas.pagamento_preferido }}</strong></article>
+    <article><span>Total de pedidos</span><strong>{{ estimativas.pedidos }}</strong></article>
+    <article><span>Unidades compradas / pagas</span><strong>{{ estimativas.unidades }} / {{ estimativas.pagas }}</strong></article>
+  </div>
+
+  <section class="sales-history-section">
+    <h2>Histórico de compras</h2>
+    <div class="sales-history-list">
+      {% for pedido in pedidos %}
+        <article class="sales-history-card">
+          {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% else %}<span class="purchased-product-placeholder" aria-hidden="true">🧁</span>{% endif %}
+          <div><strong>{{ pedido.nome }}</strong><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.data }}</span><small>{{ pedido.entrega }} · {{ pedido.pagamento }}</small></div>
+          <span class="payment-status {{ 'is-paid' if pedido.pago else 'is-pending' }}">{{ pedido.situacao }}</span>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

@@ -8,7 +8,11 @@
     <img class="hero-feature-image" src="/static/img/foto_inicial.png" alt="Ilustração de uma pessoa experimentando um doce">
     <p class="lead">O Come Doce aproxima compradores e vendedores em um espaço fácil, organizado e gostoso de usar.</p>
     <div class="hero-actions">
-      <a class="button" href="/cadastro">Quero criar uma conta</a>
+      {% if usuario %}
+        <a class="button" href="/perfil">Ir para meu perfil</a>
+      {% else %}
+        <a class="button" href="/cadastro">Quero criar uma conta</a>
+      {% endif %}
       <a class="button button-secondary" href="#como-funciona">Conhecer o projeto</a>
     </div>
   </div>
@@ -43,9 +47,9 @@
 <section id="proximas-etapas" class="next-step">
   <div>
     <span class="eyebrow">Construção por etapas</span>
-    <h2>O cadastro já está disponível.</h2>
-    <p>Crie uma conta de comprador ou vendedor. O login e os perfis serão adicionados depois da avaliação desta etapa.</p>
+    <h2>Cadastro e acesso já estão disponíveis.</h2>
+    <p>Crie uma conta de comprador ou vendedor, entre com segurança e acesse o perfil correspondente.</p>
   </div>
-  <a class="button" href="/cadastro">Criar conta</a>
+  {% if usuario %}<a class="button" href="/perfil">Meu perfil</a>{% else %}<a class="button" href="/login">Entrar</a>{% endif %}
 </section>
 {% endblock %}

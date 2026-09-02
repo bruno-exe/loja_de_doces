@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Pagamento · Come Doce{% endblock %}
+{% block content %}
+<section class="payment-page">
+  <a class="back-link" href="/minhas-compras/vendedores/{{ vendedor.id }}">← Voltar para Minhas compras</a>
+  <header class="payment-seller-header">
+    {% if vendedor.foto %}<img src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem de {{ vendedor.nome }}">{% else %}<span class="payment-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</span>{% endif %}
+    <div><span class="eyebrow">Pagamento para</span><h1>{{ vendedor.nome }}</h1></div>
+  </header>
+
+  <article class="payment-order-card">
+    {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% endif %}
+    <div class="payment-order-description"><h2>{{ pedido.nome }}</h2><p>{{ pedido.descricao }}</p><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.valor_unitario }} cada</span></div>
+    <strong>{{ pedido.valor_total }}</strong>
+  </article>
+
+  <section class="pix-payment-card">
+    <span class="eyebrow">Pague com Pix</span><h2>Chave Pix do vendedor</h2>
+    {% if vendedor.chave_pix %}<div class="pix-key-value">{{ vendedor.chave_pix }}</div><p>Faça o pagamento no aplicativo do seu banco. A confirmação automática será adicionada futuramente.</p>{% else %}<div class="form-errors" role="alert">Este vendedor ainda não cadastrou uma chave Pix. Combine o pagamento diretamente com ele.</div>{% endif %}
+  </section>
+
+  <section class="receipt-upload-card">
+    <span class="eyebrow">Comprovante</span><h2>Comprovante de pagamento</h2>
+    {% if pedido.comprovante %}
+      <div class="receipt-saved" role="status"><strong>Comprovante anexado</strong><span>Enviado em {{ pedido.comprovante.enviado_em }}</span></div>
+      <img class="receipt-preview" src="/pagamentos/comprovantes/{{ pedido.comprovante.id }}/imagem" alt="Comprovante anexado ao pedido">
+      <p>O comprovante está salvo permanentemente neste pedido e não pode ser apagado ou substituído.</p>
+      <section class="receipt-ocr-result">
+        <h3>Texto extraído do comprovante</h3>
+        {% if pedido.comprovante.texto_ocr %}<pre>{{ pedido.comprovante.texto_ocr }}</pre>{% else %}<div class="form-errors" role="alert">{{ pedido.comprovante.ocr_erro or 'Nenhum texto foi reconhecido na imagem.' }}</div>{% endif %}
+      </section>
+    {% else %}
+      {% set receipt_error = request.query_params.get('erro_comprovante') %}
+      {% if receipt_error %}<div class="form-errors" role="alert">{% if receipt_error == 'tipo' %}Escolha uma imagem JPG, PNG ou WebP.{% elif receipt_error == 'tamanho' %}A imagem deve ter no máximo 10 MB.{% elif receipt_error == 'ja_enviado' %}Este pedido já possui um comprovante e ele não pode ser substituído.{% else %}Não foi possível reconhecer uma imagem válida.{% endif %}</div>{% endif %}
+      {% if request.query_params.get('comprovante') %}<div class="account-photo-success">Comprovante anexado com sucesso.</div>{% endif %}
+      <p>Anexe uma imagem legível do comprovante. Depois do envio, ela não poderá ser apagada ou trocada.</p>
+      <form class="receipt-upload-form" method="post" action="/pagamentos/pedidos/{{ pedido.id }}/comprovante" enctype="multipart/form-data">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <label class="field-label">Imagem do comprovante<input type="file" name="comprovante" accept="image/jpeg,image/png,image/webp" required></label>
+        <button class="button" type="submit">Anexar comprovante</button>
+      </form>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

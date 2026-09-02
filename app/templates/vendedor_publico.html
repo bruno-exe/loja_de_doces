@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ vendedor.nome }} · Come Doce{% endblock %}
+{% block content %}
+<section class="public-seller-page">
+  <a class="back-link" href="/doces">← Voltar para Doces</a>
+
+  <header class="public-seller-header">
+    {% if vendedor.foto %}
+      <img class="public-seller-photo" src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem dos doces de {{ vendedor.nome }}">
+    {% else %}
+      <div class="public-seller-photo public-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</div>
+    {% endif %}
+    <div class="public-seller-info">
+      <span class="account-badge seller-badge">Vendedor</span>
+      <h1>{{ vendedor.nome }}</h1>
+      <dl class="store-summary-list">
+        <div><dt>Reputação</dt><dd>{{ vendedor.reputacao }}/10</dd></div>
+        <div><dt>Doces cadastrados</dt><dd>{{ vendedor.quantidade_doces }}</dd></div>
+      </dl>
+      <p>{{ vendedor.frase if vendedor.frase else 'Este vendedor ainda não adicionou uma frase de apresentação.' }}</p>
+      {% if vendedor.is_owner %}<div class="public-seller-owner-actions"><a class="edit-public-seller-link" href="/conta/editar">Editar minha apresentação</a><a class="button button-small" href="/produtos/novo">Criar produto</a></div>{% endif %}
+    </div>
+  </header>
+
+  <section class="seller-sweets-section">
+    {% if request.query_params.get('pedido') == '1' %}<div class="product-created-success" role="status">Compra registrada com sucesso!</div>{% endif %}
+    <div class="seller-sweets-heading">
+      <div><span class="eyebrow">Vitrine</span><h2>Doces de {{ vendedor.nome }}</h2></div>
+      {% if vendedor.is_owner %}<a class="button button-small" href="/produtos/novo">Criar produto</a>{% endif %}
+    </div>
+
+    {% if doces %}
+      {% set can_buy_products = not vendedor.is_owner %}{% include "_product_cards.html" %}
+    {% else %}
+      <div class="seller-products-empty">
+        <span aria-hidden="true">🧁</span>
+        <h3>Nenhum doce cadastrado</h3>
+        {% if vendedor.is_owner %}<p>Use o botão “Criar produto” para adicionar o primeiro doce.</p>{% else %}<p>Este vendedor ainda não cadastrou doces.</p>{% endif %}
+      </div>
+    {% endif %}
+  </section>
+</section>
+
+{% if not vendedor.is_owner %}
+<dialog id="purchaseDialog" class="purchase-dialog">
+  <form id="purchaseForm" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="purchase-dialog-heading"><div><span class="eyebrow">Finalizar pedido</span><h2 id="purchaseProductName">Comprar doce</h2></div><button type="button" class="purchase-dialog-close" aria-label="Fechar">&times;</button></div>
+    <label class="product-checkbox"><input id="purchasePayLater" type="checkbox" name="pagar_depois"><span>Comprar e pagar depois</span></label>
+    <p id="purchasePayLaterNote" class="purchase-option-note"></p>
+    <label class="product-checkbox"><input id="purchaseDelivery" type="checkbox" name="entregar_aqui"><span>Entregar aqui</span></label>
+    <p id="purchaseDeliveryNote" class="purchase-option-note"></p>
+    <label class="field-label">Quantidade<input type="number" name="quantidade" value="1" min="1" max="99" required inputmode="numeric"></label>
+    <button class="button" type="submit">Comprar</button>
+  </form>
+</dialog>
+<script src="/static/js/purchase.js?v=20260901-1"></script>
+{% endif %}
+{% endblock %}
