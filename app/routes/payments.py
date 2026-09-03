@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal
-from ..models import ComprovantePagamento, Pedido, PerfilVendedor, Produto, Usuario
+from ..models import ComprovantePagamento, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..services.pix_receipt_ocr import PixReceiptOcrError, extract_pix_receipt
@@ -66,6 +66,7 @@ def payment_page(request: Request, order_id: int):
             .where(Pedido.id == order_id, Pedido.cliente_id == user.id)
         ).first()
         receipt = database.scalar(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == order_id))
+        order_items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order_id).order_by(ItemPedido.id)).all()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado.")
 
@@ -83,6 +84,7 @@ def payment_page(request: Request, order_id: int):
         "valor_unitario": format_price(order.valor_unitario_centavos),
         "valor_total": format_price(order.valor_total_centavos),
         "pago": order.pago,
+        "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in order_items],
         "comprovante": {"id": receipt.id, "enviado_em": receipt.enviado_em.strftime("%d/%m/%Y às %H:%M"), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro} if receipt else None,
     }
     seller_data = {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "chave_pix": seller_profile.chave_pix}

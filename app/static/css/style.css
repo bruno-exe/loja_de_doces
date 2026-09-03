@@ -548,6 +548,14 @@ h1 {
 .product-form-fields textarea:focus { border-color: var(--caramel); outline: 3px solid rgba(217,119,42,.16); }
 .product-checkbox { padding: 13px 14px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 13px; background: var(--cream); font-weight: 750; cursor: pointer; }
 .product-checkbox input { width: 20px; height: 20px; margin: 0; accent-color: var(--caramel); }
+.product-variations-editor { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fffaf5; }
+.product-variations-editor legend { padding: 0 5px; font-weight: 850; }
+.product-variations-editor > p { margin: 0 0 12px; color: var(--chocolate-soft); font-size: .82rem; }
+#productVariationFields { display: grid; gap: 8px; }
+.product-variation-field { display: grid; grid-template-columns: minmax(0,1fr) 38px; gap: 7px; }
+.product-variation-field input { width: 100%; padding: 10px 12px; color: var(--chocolate); border: 1px solid #d8c5b8; border-radius: 11px; background: white; font: inherit; }
+.product-variation-field button { color: #a02d24; border: 1px solid #e2c3bc; border-radius: 10px; background: #fff; font-size: 1.35rem; cursor: pointer; }
+.product-variations-editor > button { margin-top: 10px; }
 .product-image-editor { min-width: 0; }
 .product-image-editor h2 { margin-bottom: 7px; font-family: Georgia,serif; font-size: 1.8rem; }
 .product-image-editor > p { color: var(--chocolate-soft); }
@@ -564,6 +572,7 @@ h1 {
 .product-card-content h3 { margin-bottom: 7px; font-family: Georgia,serif; font-size: 1.45rem; overflow-wrap: anywhere; }
 .product-card-content p { margin-bottom: 13px; color: var(--chocolate-soft); font-size: .9rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .product-price { display: block; color: #a94f0c; font-size: 1.25rem; }
+.product-variation-summary { margin: 10px 0 0; padding-left: 18px; color: var(--chocolate-soft); font-size: .8rem; line-height: 1.5; }
 .product-options { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
 .product-options span { padding: 5px 8px; color: #71401d; border-radius: 999px; background: #ffead7; font-size: .72rem; font-weight: 800; }
 .product-buy-button { width: 100%; margin-top: 16px; border: 0; font: inherit; cursor: pointer; }
@@ -575,6 +584,11 @@ h1 {
 .purchase-dialog-close { padding: 0 7px; color: var(--chocolate-soft); border: 0; background: transparent; font: inherit; font-size: 2rem; line-height: 1; cursor: pointer; }
 .purchase-option-note { margin: -8px 4px 0; color: var(--chocolate-soft); font-size: .78rem; }
 .purchase-dialog input:disabled + span { color: #9c8d84; }
+.purchase-variation-options { display: grid; gap: 8px; }
+.purchase-variation-options:not(:empty)::before { content: "Escolha as quantidades"; color: var(--chocolate-soft); font-size: .82rem; font-weight: 800; }
+.purchase-variation-row { padding: 10px 12px; display: grid; grid-template-columns: minmax(0,1fr) 76px; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--cream); }
+.purchase-variation-row span { overflow-wrap: anywhere; }
+.purchase-variation-row input { width: 100%; padding: 8px; border: 1px solid #d8c5b8; border-radius: 9px; background: white; font: inherit; text-align: center; }
 
 .purchases-page { width: min(900px,calc(100% - 40px)); min-height: calc(100vh - 150px); margin: 0 auto; padding: 58px 0 90px; }
 .purchases-heading { margin-bottom: 28px; }
@@ -601,6 +615,7 @@ h1 {
 .purchased-product-info { display: grid; gap: 5px; }
 .purchased-product-info strong { font-family: Georgia,serif; font-size: 1.15rem; }
 .purchased-product-info span { color: var(--chocolate-soft); font-size: .88rem; }
+.order-variation-list { margin: 5px 0 7px; padding-left: 18px; color: var(--chocolate-soft); font-size: .82rem; line-height: 1.45; }
 .payment-status { padding: 7px 10px; border-radius: 999px; font-size: .75rem; font-weight: 850; white-space: nowrap; }
 .payment-status.is-pending { color: #8a4a17; background: #ffead7; }
 .payment-status.is-paid { color: #285f38; background: #e3f4e7; }

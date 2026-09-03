@@ -30,6 +30,15 @@
       </label>
       <label class="product-checkbox"><input type="checkbox" name="aceita_fiado" {% if form.aceita_fiado %}checked{% endif %}><span>Aceita venda fiada</span></label>
       <label class="product-checkbox"><input type="checkbox" name="com_entrega" {% if form.com_entrega %}checked{% endif %}><span>Com entrega</span></label>
+      <fieldset class="product-variations-editor">
+        <legend>Subcategorias ou sabores</legend>
+        <p>Ex.: chocolate, morango e leite ninho. Todas usarão o valor informado acima.</p>
+        <div id="productVariationFields">
+          {% set saved_variations = form.subcategorias or [''] %}
+          {% for variation in saved_variations %}<div class="product-variation-field"><input name="subcategorias" maxlength="120" value="{{ variation }}" placeholder="Nome da subcategoria"><button type="button" data-remove-variation aria-label="Remover subcategoria">&times;</button></div>{% endfor %}
+        </div>
+        <button id="addProductVariation" class="face-mode-button" type="button">Adicionar subcategoria</button>
+      </fieldset>
     </div>
 
     <div class="product-image-editor">
@@ -69,4 +78,5 @@
   <div class="camera-dialog-actions"><button id="takeProductPhoto" class="button" type="button">Fotografar</button><button id="closeProductCamera" class="button button-secondary" type="button">Cancelar</button></div>
 </dialog>
 <script src="/static/js/product_photo.js?v=20260901-1"></script>
+<script src="/static/js/product_variations.js?v=20260902-1"></script>
 {% endblock %}

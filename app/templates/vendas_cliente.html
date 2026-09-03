@@ -23,7 +23,7 @@
       {% for pedido in pedidos %}
         <article class="sales-history-card">
           {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% else %}<span class="purchased-product-placeholder" aria-hidden="true">🧁</span>{% endif %}
-          <div><strong>{{ pedido.nome }}</strong><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.data }}</span><small>{{ pedido.entrega }} · {{ pedido.pagamento }}</small></div>
+          <div><strong>{{ pedido.nome }}</strong><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.data }}</span>{% if pedido.itens %}<ul class="order-variation-list">{% for item in pedido.itens %}<li>{{ item.nome }}: {{ item.quantidade }}</li>{% endfor %}</ul>{% endif %}<small>{{ pedido.entrega }} · {{ pedido.pagamento }}</small></div>
           <span class="payment-status {{ 'is-paid' if pedido.pago else 'is-pending' }}">{{ pedido.situacao }}</span>
         </article>
       {% endfor %}

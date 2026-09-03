@@ -62,6 +62,19 @@ class Produto(Base):
     imagem: Mapped[str] = mapped_column(String(255))
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    variacoes: Mapped[list["VariacaoProduto"]] = relationship(
+        back_populates="produto", cascade="all, delete-orphan", order_by="VariacaoProduto.id"
+    )
+
+
+class VariacaoProduto(Base):
+    __tablename__ = "variacoes_produtos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id"), index=True)
+    nome: Mapped[str] = mapped_column(String(120))
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    produto: Mapped[Produto] = relationship(back_populates="variacoes")
 
 
 class Pedido(Base):
@@ -86,6 +99,21 @@ class Pedido(Base):
     pago: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="recebido")
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    itens: Mapped[list["ItemPedido"]] = relationship(
+        back_populates="pedido", cascade="all, delete-orphan", order_by="ItemPedido.id"
+    )
+
+
+class ItemPedido(Base):
+    __tablename__ = "itens_pedidos"
+    __table_args__ = (CheckConstraint("quantidade BETWEEN 1 AND 99", name="ck_itens_pedidos_quantidade"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pedido_id: Mapped[int] = mapped_column(ForeignKey("pedidos.id"), index=True)
+    variacao_id: Mapped[int | None] = mapped_column(ForeignKey("variacoes_produtos.id"), nullable=True, index=True)
+    variacao_nome: Mapped[str] = mapped_column(String(120))
+    quantidade: Mapped[int] = mapped_column(Integer)
+    pedido: Mapped[Pedido] = relationship(back_populates="itens")
 
 
 class VisitaPerfilVendedor(Base):

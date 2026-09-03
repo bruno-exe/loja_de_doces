@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from ..database import SessionLocal
-from ..models import Pedido, Produto, Usuario
+from ..models import ItemPedido, Pedido, Produto, Usuario, VariacaoProduto
 from ..security import csrf_token, validate_csrf
 from ..services.profile_photo import ProfilePhotoError, process_seller_image
 from ..session import current_user
@@ -35,6 +35,7 @@ def product_card(product: Produto) -> dict:
         "aceita_fiado": product.aceita_fiado,
         "com_entrega": product.com_entrega,
         "imagem": product.imagem,
+        "variacoes": [{"id": variation.id, "nome": variation.nome} for variation in product.variacoes if variation.ativo],
     }
 
 
@@ -105,6 +106,7 @@ async def create_product(
     valor: str = Form(...),
     aceita_fiado: bool = Form(False),
     com_entrega: bool = Form(False),
+    subcategorias: list[str] = Form([]),
     imagem: UploadFile = File(...),
     focus_x: float | None = Form(None),
     focus_y: float | None = Form(None),
@@ -131,6 +133,21 @@ async def create_product(
         errors.append("Use uma imagem JPG, PNG ou WebP.")
     if (focus_x is None) != (focus_y is None) or (focus_x is not None and not 0 <= focus_x <= 1) or (focus_y is not None and not 0 <= focus_y <= 1):
         errors.append("O ponto de foco selecionado é inválido.")
+    variation_names: list[str] = []
+    seen_variations: set[str] = set()
+    for raw_name in subcategorias:
+        variation_name = " ".join(raw_name.strip().split())
+        if not variation_name:
+            continue
+        if len(variation_name) > 120:
+            errors.append("Cada subcategoria deve ter no máximo 120 caracteres.")
+            continue
+        normalized_name = variation_name.casefold()
+        if normalized_name not in seen_variations:
+            seen_variations.add(normalized_name)
+            variation_names.append(variation_name)
+    if len(variation_names) > 20:
+        errors.append("Cadastre no máximo 20 subcategorias por produto.")
 
     safe_form = {
         "nome": nome,
@@ -138,6 +155,7 @@ async def create_product(
         "valor": valor,
         "aceita_fiado": aceita_fiado,
         "com_entrega": com_entrega,
+        "subcategorias": variation_names,
     }
     contents = await imagem.read(5 * 1024 * 1024 + 1)
     if len(contents) > 5 * 1024 * 1024:
@@ -161,8 +179,7 @@ async def create_product(
     image_path.write_bytes(processed_image)
     try:
         with SessionLocal() as database:
-            database.add(
-                Produto(
+            product = Produto(
                     vendedor_id=usuario.id,
                     nome=nome,
                     descricao=descricao,
@@ -171,6 +188,11 @@ async def create_product(
                     com_entrega=com_entrega,
                     imagem=filename,
                 )
+            database.add(product)
+            database.flush()
+            database.add_all(
+                VariacaoProduto(produto_id=product.id, nome=variation_name)
+                for variation_name in variation_names
             )
             database.commit()
     except Exception:
@@ -204,10 +226,10 @@ def delete_product(request: Request, product_id: int, csrf: str = Form(...)):
 
 
 @router.post("/produtos/{product_id}/comprar")
-def buy_product(
+async def buy_product(
     request: Request,
     product_id: int,
-    quantidade: int = Form(...),
+    quantidade: int = Form(0),
     pagar_depois: bool = Form(False),
     entregar_aqui: bool = Form(False),
     csrf: str = Form(...),
@@ -216,9 +238,6 @@ def buy_product(
     usuario = current_user(request)
     if not usuario:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    if quantidade < 1 or quantidade > 99:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
-
     with SessionLocal() as database:
         product = database.scalar(
             select(Produto)
@@ -233,6 +252,26 @@ def buy_product(
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não aceita pagamento posterior.")
         if entregar_aqui and not product.com_entrega:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não possui entrega.")
+
+        active_variations = [variation for variation in product.variacoes if variation.ativo]
+        selected_items: list[tuple[VariacaoProduto | None, str, int]] = []
+        if active_variations:
+            submitted_form = await request.form()
+            for variation in active_variations:
+                raw_quantity = str(submitted_form.get(f"variacao_{variation.id}", "0")).strip()
+                try:
+                    variation_quantity = int(raw_quantity)
+                except ValueError:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
+                if variation_quantity < 0 or variation_quantity > 99:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
+                if variation_quantity:
+                    selected_items.append((variation, variation.nome, variation_quantity))
+            quantidade = sum(item[2] for item in selected_items)
+        else:
+            selected_items.append((None, product.nome, quantidade))
+        if quantidade < 1 or quantidade > 99:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
 
         order = Pedido(
                 cliente_id=usuario.id,
@@ -250,6 +289,16 @@ def buy_product(
                 status="recebido",
             )
         database.add(order)
+        database.flush()
+        database.add_all(
+            ItemPedido(
+                pedido_id=order.id,
+                variacao_id=variation.id if variation else None,
+                variacao_nome=variation_name,
+                quantidade=item_quantity,
+            )
+            for variation, variation_name, item_quantity in selected_items
+        )
         seller_id = product.vendedor_id
         database.commit()
         database.refresh(order)

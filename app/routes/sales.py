@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from ..database import SessionLocal
-from ..models import Pedido, Produto, Usuario
+from ..models import ItemPedido, Pedido, Produto, Usuario
 from ..security import csrf_token
 from ..session import current_user
 
@@ -86,7 +86,9 @@ def customer_sales_page(request: Request, customer_id: int):
         delivery_counts["Retirada"] += 0 if order.entregar_aqui else 1
         payment_counts["Pagar depois"] += 1 if order.pagar_depois else 0
         payment_counts["Pagamento imediato"] += 0 if order.pagar_depois else 1
-        history.append({"id": order.id, "nome": order.produto_nome, "imagem": product.imagem if product else None, "quantidade": order.quantidade, "data": order.criado_em.strftime("%d/%m/%Y às %H:%M"), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago})
+        with SessionLocal() as database:
+            items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
+        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": order.criado_em.strftime("%d/%m/%Y às %H:%M"), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago})
 
     def preference(counts: Counter, tie_text: str) -> str:
         top = counts.most_common()

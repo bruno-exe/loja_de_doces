@@ -8,6 +8,9 @@
   const delivery = document.querySelector("#purchaseDelivery");
   const payLaterNote = document.querySelector("#purchasePayLaterNote");
   const deliveryNote = document.querySelector("#purchaseDeliveryNote");
+  const variationOptions = document.querySelector("#purchaseVariationOptions");
+  const quantityBlock = document.querySelector("#purchaseQuantityBlock");
+  const quantityInput = document.querySelector("#purchaseQuantity");
 
   document.querySelectorAll("[data-buy-product]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -18,6 +21,14 @@
       delivery.disabled = button.dataset.hasDelivery !== "true";
       payLaterNote.textContent = payLater.disabled ? "Este vendedor não aceita pagamento posterior para este doce." : "Você poderá pagar ao vendedor depois.";
       deliveryNote.textContent = delivery.disabled ? "Este doce está disponível somente para retirada." : "O vendedor entregará no local combinado.";
+      const hasVariations = button.dataset.hasVariations === "true";
+      variationOptions.replaceChildren();
+      quantityBlock.hidden = hasVariations;
+      quantityInput.disabled = hasVariations;
+      if (hasVariations) {
+        const template = document.querySelector(`#purchaseVariations${button.dataset.productId}`);
+        if (template) variationOptions.appendChild(template.content.cloneNode(true));
+      }
       dialog.showModal();
     });
   });

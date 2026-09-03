@@ -18,7 +18,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, ItemPedido, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -543,6 +543,7 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
                 "valor": "7,50",
                 "focus_x": "0.70",
                 "focus_y": "0.45",
+                "subcategorias": ["Chocolate", "Morango", "Leite ninho"],
             },
             files={"imagem": ("brigadeiro.png", source_bytes.getvalue(), "image/png")},
             follow_redirects=False,
@@ -556,6 +557,7 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
             assert product.valor_centavos == 750
             assert product.aceita_fiado is False
             assert product.com_entrega is False
+            assert [variation.nome for variation in product.variacoes] == ["Chocolate", "Morango", "Leite ninho"]
             image_path = tmp_path / product.imagem
             with Image.open(image_path) as saved_image:
                 assert saved_image.size == (600, 600)
@@ -566,6 +568,9 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
         assert "R$ 7,50" in clean_page.text
         assert 'value="Brigadeiro especial"' not in clean_page.text
         assert "Excluir produto" in clean_page.text
+        assert "Chocolate" in clean_page.text
+        assert "Morango" in clean_page.text
+        assert "Leite ninho" in clean_page.text
 
         updated_profile = client.get("/perfil")
         assert "1 produto cadastrado" in updated_profile.text
@@ -721,6 +726,48 @@ def test_customer_buys_product_from_storefront() -> None:
             data={"csrf": csrf_from(own_storefront), "quantidade": "1"},
         )
         assert forbidden.status_code == 403
+
+
+def test_customer_selects_multiple_product_variations() -> None:
+    seller = create_test_user("sabores-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("sabores-comprador@teste.com", "comprador")
+    with SessionLocal() as database:
+        product = Produto(vendedor_id=seller.id, nome="Bombom", descricao="Bombons artesanais", valor_centavos=400, aceita_fiado=True, com_entrega=True, imagem="bombom.webp")
+        product.variacoes = [VariacaoProduto(nome="Chocolate"), VariacaoProduto(nome="Morango"), VariacaoProduto(nome="Leite ninho")]
+        database.add(product)
+        database.commit()
+        database.refresh(product)
+        variations = {variation.nome: variation.id for variation in product.variacoes}
+
+    with TestClient(app) as client:
+        login_page = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login_page), "email": buyer.email, "senha": "senha-segura"})
+        storefront = client.get(f"/vendedores/{seller.id}")
+        assert "Chocolate" in storefront.text
+        assert "Morango" in storefront.text
+        assert "Leite ninho" in storefront.text
+        assert f'name="variacao_{variations["Morango"]}"' in storefront.text
+
+        purchase = client.post(
+            f"/produtos/{product.id}/comprar",
+            data={"csrf": csrf_from(storefront), "pagar_depois": "true", f"variacao_{variations['Chocolate']}": "1", f"variacao_{variations['Morango']}": "2", f"variacao_{variations['Leite ninho']}": "0"},
+            follow_redirects=False,
+        )
+        assert purchase.status_code == 303
+        assert purchase.headers["location"] == f"/vendedores/{seller.id}?pedido=1"
+
+        history = client.get(f"/minhas-compras/vendedores/{seller.id}")
+        assert "Bombom" in history.text
+        assert "Chocolate: 1" in history.text
+        assert "Morango: 2" in history.text
+        assert "Leite ninho: 0" not in history.text
+
+    with SessionLocal() as database:
+        order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product.id))
+        assert order.quantidade == 3
+        assert order.valor_total_centavos == 1200
+        items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
+        assert [(item.variacao_nome, item.quantidade) for item in items] == [("Chocolate", 1), ("Morango", 2)]
 
 
 def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> None:
