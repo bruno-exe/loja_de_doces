@@ -18,11 +18,14 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Conversa, ItemCarrinho, ItemPedido, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, Conversa, DepositoPontos, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
 from app.routes import payments as payment_routes
+from app.routes.point_deposits import credit_confirmed_payment, parse_brl
+from app.services.mercadopago_points import PaymentResult
+from app.config import settings
 from app.services.profile_photo import process_profile_photo, process_seller_image
 
 
@@ -927,6 +930,7 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
             assert database.get(Pedido, provisional_order.id).confirmado is True
         receipt_page = buyer_client.get(uploaded.headers["location"])
         assert "Comprovante anexado" in receipt_page.text
+        assert "Você ganhou 250 pontos!" in receipt_page.text
         assert "não pode ser apagado ou substituído" in receipt_page.text
         assert "Anexar comprovante" not in receipt_page.text
         assert "Texto extraído do comprovante" in receipt_page.text
@@ -952,8 +956,16 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         assert repeated.status_code == 303
         assert repeated.headers["location"].endswith("?erro_comprovante=ja_enviado")
         assert saved_receipt.exists()
+        points_page = buyer_client.get("/pontos")
+        assert points_page.status_code == 200
+        assert "pontos acumulados" in points_page.text
+        assert ">250</strong>" in points_page.text
         with SessionLocal() as database:
             assert len(database.scalars(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == receipt.pedido_id)).all()) == 1
+            point_entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.usuario_id == buyer.id)).all()
+            assert len(point_entries) == 1
+            assert point_entries[0].quantidade == 250
+            assert point_entries[0].comprovante_id == receipt.id
 
         purchases = buyer_client.get(f"/minhas-compras/vendedores/{seller.id}")
         assert "Pagamento pendente" in purchases.text
@@ -1025,3 +1037,30 @@ def test_buyer_and_seller_can_exchange_private_messages() -> None:
         assert len(conversations) == 1
         assert [message.texto for message in messages] == ["Olá, este doce está disponível?", "Sim, está disponível."]
         assert messages[0].lida is True
+
+
+def test_confirmed_point_deposit_credits_once() -> None:
+    buyer = create_test_user("deposito-pontos@teste.com", "comprador")
+    assert parse_brl("1,00") == 100
+    assert parse_brl("10.00") == 1000
+    with SessionLocal() as database:
+        deposit = DepositoPontos(
+            usuario_id=buyer.id, valor_centavos=100, quantidade_pontos=1000,
+            external_reference="comedoce_points_test", idempotency_key="deposit-test-key",
+        )
+        database.add(deposit)
+        database.commit()
+        database.refresh(deposit)
+        payment = PaymentResult(
+            payment_id="mp-test-payment", external_reference=deposit.external_reference,
+            status="approved", status_detail="accredited", amount=Decimal("1.00"),
+            currency="BRL", collector_id=settings.mercadopago_user_id or None,
+            live_mode=True,
+        )
+        assert credit_confirmed_payment(database, payment)[1] is True
+        database.commit()
+        assert credit_confirmed_payment(database, payment)[1] is True
+        database.commit()
+        entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.deposito_id == deposit.id)).all()
+        assert len(entries) == 1
+        assert entries[0].quantidade == 1000

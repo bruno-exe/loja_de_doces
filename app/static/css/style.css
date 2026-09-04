@@ -895,3 +895,35 @@ h1 {
   .message-form { grid-template-columns: 1fr; }
   .message-form .button { width: 100%; }
 }
+
+.points-page { width: min(760px,calc(100% - 40px)); min-height: calc(100vh - 150px); margin: 0 auto; padding: 58px 0 90px; }
+.points-heading { margin-bottom: 26px; }
+.points-heading h1 { margin: 5px 0 9px; font-size: clamp(2.7rem,7vw,5rem); }
+.points-heading p { max-width: 620px; color: var(--chocolate-soft); line-height: 1.6; }
+.points-balance-card { padding: 32px; display: grid; justify-items: center; border: 1px solid #efc18f; border-radius: 26px; background: linear-gradient(145deg,#fff8ef,#ffe5c5); box-shadow: var(--shadow); text-align: center; }
+.points-balance-card > span { color: var(--chocolate-soft); font-size: .85rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.points-balance-card > strong { color: #a84e0b; font-family: Georgia,serif; font-size: clamp(4rem,15vw,7rem); line-height: 1; }
+.points-balance-card > p { margin: 6px 0 0; color: var(--chocolate-soft); }
+.points-rule-card { margin-top: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: white; }
+.points-rule-card strong { font-family: Georgia,serif; font-size: 1.18rem; }
+.points-rule-card p { margin: 7px 0 0; color: var(--chocolate-soft); line-height: 1.5; }
+.points-earned-notice { margin-bottom: 13px; padding: 14px 16px; color: #285f38; border: 1px solid #add2b7; border-radius: 13px; background: #e3f4e7; font-weight: 800; }
+.points-deposit-card { margin-top: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: white; }
+.points-deposit-card h2,.points-deposit-history h2 { margin: 5px 0 8px; font-family: Georgia,serif; }
+.points-deposit-card > p { color: var(--chocolate-soft); line-height: 1.5; }
+.points-deposit-form { margin-top: 16px; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 14px; }
+.points-deposit-form .button { min-height: 48px; }
+.points-deposit-form .button:disabled { opacity: .55; cursor: not-allowed; }
+.payment-disabled-note { font-size: .82rem; }
+.points-deposit-history { margin-top: 22px; }
+.points-deposit-history > div { padding: 11px 14px; display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); background: white; }
+.points-return-page { width: min(680px,calc(100% - 40px)); min-height: calc(100vh - 150px); margin: 0 auto; padding: 70px 0; }
+.points-return-page article { padding: 32px; border: 1px solid var(--line); border-radius: 24px; background: white; box-shadow: var(--shadow); text-align: center; }
+.points-return-page h1 { margin: 6px 0 10px; font-size: clamp(2.2rem,7vw,4rem); }
+.points-return-page p { margin-bottom: 20px; color: var(--chocolate-soft); }
+
+@media (max-width: 620px) {
+  .points-page { width: calc(100% - 28px); padding: 40px 0 58px; }
+  .points-balance-card { padding: 26px 20px; }
+  .points-deposit-form { grid-template-columns: 1fr; }
+}

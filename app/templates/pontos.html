@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Pontos · Come Doce{% endblock %}
+{% block content %}
+<section class="points-page">
+  <header class="points-heading">
+    <span class="eyebrow">Programa de pontos</span>
+    <h1>Pontos</h1>
+    <p>Compre e acumule pontos. Os pontos servirão para ganhar mais pontos e trocar por itens ou dinheiro.</p>
+  </header>
+
+  <article class="points-balance-card">
+    <span>Seu saldo</span>
+    <strong>{{ pontos }}</strong>
+    <p>{{ 'ponto acumulado' if pontos == 1 else 'pontos acumulados' }}</p>
+  </article>
+
+  <div class="points-rule-card">
+    <strong>Como ganhar pontos?</strong>
+    <p>Você ganha 250 pontos, equivalentes a R$ 0,25, sempre que anexa o comprovante de pagamento de um pedido.</p>
+  </div>
+  <section class="points-deposit-card">
+    <span class="eyebrow">Comprar pontos</span>
+    <h2>Adicionar pontos</h2>
+    <p>R$ 1,00 equivale a 1.000 pontos. Os pontos só entram no saldo após a confirmação do Mercado Pago.</p>
+    {% set deposit_error = request.query_params.get('erro') %}
+    {% if deposit_error %}<div class="form-errors" role="alert">{% if deposit_error == 'valor' %}Informe um valor válido em reais.{% elif deposit_error == 'limite' %}O valor deve ficar entre R$ {{ '%.2f'|format(minimo_reais)|replace('.', ',') }} e R$ {{ '%.2f'|format(maximo_reais)|replace('.', ',') }}.{% elif deposit_error == 'endereco' %}Configure o endereço público do site antes de receber pagamentos.{% elif deposit_error == 'configuracao' %}O Mercado Pago ainda não está configurado.{% else %}Não foi possível abrir o Mercado Pago. Tente novamente.{% endif %}</div>{% endif %}
+    <form class="points-deposit-form" method="post" action="/pontos/deposito">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label class="field-label">Valor em reais<input name="valor" inputmode="decimal" required placeholder="10,00"><small>Você receberá 1.000 pontos para cada R$ 1,00.</small></label>
+      <button class="button" type="submit" {% if not pagamentos_ativos %}disabled{% endif %}>Continuar para o Mercado Pago</button>
+    </form>
+    {% if not pagamentos_ativos %}<p class="payment-disabled-note">Pagamentos reais estão desativados nesta instalação.</p>{% endif %}
+  </section>
+  {% if depositos %}<section class="points-deposit-history"><h2>Últimos depósitos</h2>{% for deposito in depositos %}<div><span>{{ deposito.quantidade_pontos }} pontos</span><strong>{{ 'Pago' if deposito.status == 'paid' else ('Falhou' if deposito.status == 'failed' else 'Aguardando pagamento') }}</strong></div>{% endfor %}</section>{% endif %}
+</section>
+{% endblock %}

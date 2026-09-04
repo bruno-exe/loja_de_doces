@@ -195,3 +195,39 @@ class Mensagem(Base):
     lida: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     enviada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     conversa: Mapped[Conversa] = relationship(back_populates="mensagens")
+
+
+class LancamentoPontos(Base):
+    __tablename__ = "lancamentos_pontos"
+    __table_args__ = (CheckConstraint("quantidade != 0", name="ck_lancamentos_pontos_quantidade"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    comprovante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("comprovantes_pagamentos.id"), unique=True, nullable=True, index=True
+    )
+    deposito_id: Mapped[int | None] = mapped_column(
+        ForeignKey("depositos_pontos.id"), unique=True, nullable=True, index=True
+    )
+    quantidade: Mapped[int] = mapped_column(Integer)
+    motivo: Mapped[str] = mapped_column(String(160))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+
+class DepositoPontos(Base):
+    __tablename__ = "depositos_pontos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    valor_centavos: Mapped[int] = mapped_column(Integer)
+    quantidade_pontos: Mapped[int] = mapped_column(Integer)
+    provider_preference_id: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True)
+    external_reference: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(80), unique=True)
+    checkout_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_status: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    provider_status_detail: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

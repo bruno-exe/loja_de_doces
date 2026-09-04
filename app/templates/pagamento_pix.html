@@ -22,6 +22,7 @@
   <section class="receipt-upload-card">
     <span class="eyebrow">Comprovante</span><h2>Comprovante de pagamento</h2>
     {% if pedido.comprovante %}
+      {% if request.query_params.get('comprovante') %}<div class="points-earned-notice" role="status">Comprovante anexado com sucesso. Você ganhou 250 pontos!</div>{% endif %}
       <div class="receipt-saved" role="status"><strong>Comprovante anexado</strong><span>Enviado em {{ pedido.comprovante.enviado_em }}</span></div>
       <img class="receipt-preview" src="/pagamentos/comprovantes/{{ pedido.comprovante.id }}/imagem" alt="Comprovante anexado ao pedido">
       <p>O comprovante está salvo permanentemente neste pedido e não pode ser apagado ou substituído.</p>

@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal
-from ..models import ComprovantePagamento, ItemCarrinho, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario
+from ..models import ComprovantePagamento, ItemCarrinho, ItemPedido, LancamentoPontos, Pedido, PerfilVendedor, Produto, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..services.pix_receipt_ocr import PixReceiptOcrError, extract_pix_receipt
@@ -125,6 +125,13 @@ async def upload_payment_receipt(request: Request, order_id: int, comprovante: U
         with SessionLocal() as database:
             receipt = ComprovantePagamento(pedido_id=order_id, cliente_id=user.id, arquivo=filename)
             database.add(receipt)
+            database.flush()
+            database.add(LancamentoPontos(
+                usuario_id=user.id,
+                comprovante_id=receipt.id,
+                quantidade=250,
+                motivo="Comprovante de pagamento enviado",
+            ))
             pending_cart_items = database.scalars(
                 select(ItemCarrinho).where(ItemCarrinho.cliente_id == user.id, ItemCarrinho.pedido_pendente_id == order_id)
             ).all()

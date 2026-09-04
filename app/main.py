@@ -20,6 +20,8 @@ from .routes.payments import router as payments_router
 from .routes.cart import router as cart_router
 from .routes.availability import router as availability_router
 from .routes.messages import router as messages_router
+from .routes.points import router as points_router
+from .routes.point_deposits import router as point_deposits_router
 from .security import csrf_token
 from .session import current_user
 
@@ -74,6 +76,22 @@ async def lifespan(_: FastAPI):
         for column_name, column_type in receipt_migrations.items():
             if column_name not in receipt_columns:
                 connection.execute(text(f"ALTER TABLE comprovantes_pagamentos ADD COLUMN {column_name} {column_type}"))
+        connection.execute(text(
+            "INSERT INTO lancamentos_pontos (usuario_id, comprovante_id, quantidade, motivo, criado_em) "
+            "SELECT cliente_id, id, 250, 'Comprovante de pagamento enviado', enviado_em "
+            "FROM comprovantes_pagamentos AS comprovante "
+            "WHERE NOT EXISTS (SELECT 1 FROM lancamentos_pontos AS lancamento "
+            "WHERE lancamento.comprovante_id = comprovante.id)"
+        ))
+        connection.execute(text(
+            "UPDATE lancamentos_pontos SET quantidade = 250 "
+            "WHERE comprovante_id IS NOT NULL AND quantidade = 1 "
+            "AND motivo = 'Comprovante de pagamento enviado'"
+        ))
+        point_columns = {column["name"] for column in inspect(engine).get_columns("lancamentos_pontos")}
+        if "deposito_id" not in point_columns:
+            connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN deposito_id INTEGER"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_deposito_id_unique ON lancamentos_pontos (deposito_id) WHERE deposito_id IS NOT NULL"))
     yield
 
 
@@ -104,6 +122,8 @@ app.include_router(payments_router)
 app.include_router(cart_router)
 app.include_router(availability_router)
 app.include_router(messages_router)
+app.include_router(points_router)
+app.include_router(point_deposits_router)
 
 
 @app.get("/", response_class=HTMLResponse)
