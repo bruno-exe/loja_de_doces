@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -164,3 +164,34 @@ class ComprovantePagamento(Base):
     texto_ocr: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_erro: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_processado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Conversa(Base):
+    __tablename__ = "conversas"
+    __table_args__ = (
+        UniqueConstraint("cliente_id", "vendedor_id", name="uq_conversas_cliente_vendedor"),
+        CheckConstraint("cliente_id != vendedor_id", name="ck_conversas_participantes_diferentes"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    pedido_id: Mapped[int | None] = mapped_column(ForeignKey("pedidos.id"), nullable=True, index=True)
+    criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    atualizada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    mensagens: Mapped[list["Mensagem"]] = relationship(
+        back_populates="conversa", cascade="all, delete-orphan", order_by="Mensagem.id"
+    )
+
+
+class Mensagem(Base):
+    __tablename__ = "mensagens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversa_id: Mapped[int] = mapped_column(ForeignKey("conversas.id"), index=True)
+    remetente_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    destinatario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    texto: Mapped[str] = mapped_column(Text)
+    lida: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    enviada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    conversa: Mapped[Conversa] = relationship(back_populates="mensagens")

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Come Doce: um espaço para compradores e vendedores de doces.">
   <title>{% block title %}Come Doce{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260903-pause1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260903-messages1">
 </head>
 <body{% if usuario %} class="authenticated-page"{% endif %}>
   <header class="site-header{% if usuario %} authenticated-header{% endif %}">
@@ -44,6 +44,7 @@
         <a href="/perfil" {% if request.url.path == '/perfil' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128100;</span> Meu perfil</a>
         <a href="/doces" {% if request.url.path == '/doces' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#129473;</span> Doces</a>
         <a href="/minhas-compras" {% if request.url.path.startswith('/minhas-compras') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Minhas compras</a>
+        <a href="/mensagens" {% if request.url.path.startswith('/mensagens') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9993;</span> Mensagens</a>
         <a id="sideMenuCart" href="/carrinho" {% if request.url.path == '/carrinho' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Carrinho</a>
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/vendas" {% if request.url.path.startswith('/vendas') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128200;</span> Vendas</a>{% endif %}
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/pausar" {% if request.url.path == '/pausar' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9208;</span> Pausar</a>{% endif %}

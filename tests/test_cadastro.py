@@ -18,7 +18,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, ItemCarrinho, ItemPedido, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, Conversa, ItemCarrinho, ItemPedido, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -965,3 +965,63 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         other_client.post("/login", data={"csrf": csrf_from(login_page), "email": other.email, "senha": "senha-segura"})
         assert other_client.get(purchase.headers["location"]).status_code == 404
         assert other_client.get(f"/pagamentos/comprovantes/{receipt.id}/imagem").status_code == 404
+
+
+def test_buyer_and_seller_can_exchange_private_messages() -> None:
+    seller = create_test_user("mensagem-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("mensagem-comprador@teste.com", "comprador")
+    outsider = create_test_user("mensagem-terceiro@teste.com", "comprador")
+
+    with TestClient(app) as buyer_client:
+        login_page = buyer_client.get("/login")
+        buyer_client.post("/login", data={"csrf": csrf_from(login_page), "email": buyer.email, "senha": "senha-segura"})
+        storefront = buyer_client.get(f"/vendedores/{seller.id}")
+        assert "Enviar mensagem" in storefront.text
+        started = buyer_client.post(
+            f"/mensagens/iniciar/{seller.id}", data={"csrf": csrf_from(storefront)}, follow_redirects=False
+        )
+        assert started.status_code == 303
+        assert re.fullmatch(r"/mensagens/\d+", started.headers["location"])
+        conversation_id = int(started.headers["location"].rsplit("/", 1)[1])
+        conversation_page = buyer_client.get(started.headers["location"])
+        sent = buyer_client.post(
+            started.headers["location"],
+            data={"csrf": csrf_from(conversation_page), "texto": "Olá, este doce está disponível?"},
+            follow_redirects=False,
+        )
+        assert sent.status_code == 303
+
+        repeated = buyer_client.post(
+            f"/mensagens/iniciar/{seller.id}", data={"csrf": csrf_from(buyer_client.get("/mensagens"))}, follow_redirects=False
+        )
+        assert repeated.headers["location"] == f"/mensagens/{conversation_id}"
+
+    with TestClient(app) as seller_client:
+        login_page = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login_page), "email": seller.email, "senha": "senha-segura"})
+        inbox = seller_client.get("/mensagens")
+        assert "mensagem-comprador" not in inbox.text
+        assert "Olá, este doce está disponível?" in inbox.text
+        assert 'class="unread-count"' in inbox.text
+        conversation_page = seller_client.get(f"/mensagens/{conversation_id}")
+        assert "Olá, este doce está disponível?" in conversation_page.text
+        replied = seller_client.post(
+            f"/mensagens/{conversation_id}",
+            data={"csrf": csrf_from(conversation_page), "texto": "Sim, está disponível."},
+            follow_redirects=False,
+        )
+        assert replied.status_code == 303
+
+    with TestClient(app) as outsider_client:
+        login_page = outsider_client.get("/login")
+        outsider_client.post("/login", data={"csrf": csrf_from(login_page), "email": outsider.email, "senha": "senha-segura"})
+        assert outsider_client.get(f"/mensagens/{conversation_id}").status_code == 404
+
+    with SessionLocal() as database:
+        conversations = database.scalars(select(Conversa).where(
+            Conversa.cliente_id == buyer.id, Conversa.vendedor_id == seller.id
+        )).all()
+        messages = database.scalars(select(Mensagem).where(Mensagem.conversa_id == conversation_id)).all()
+        assert len(conversations) == 1
+        assert [message.texto for message in messages] == ["Olá, este doce está disponível?", "Sim, está disponível."]
+        assert messages[0].lida is True

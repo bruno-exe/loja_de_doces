@@ -19,6 +19,7 @@ from .routes.sales import router as sales_router
 from .routes.payments import router as payments_router
 from .routes.cart import router as cart_router
 from .routes.availability import router as availability_router
+from .routes.messages import router as messages_router
 from .security import csrf_token
 from .session import current_user
 
@@ -102,6 +103,7 @@ app.include_router(sales_router)
 app.include_router(payments_router)
 app.include_router(cart_router)
 app.include_router(availability_router)
+app.include_router(messages_router)
 
 
 @app.get("/", response_class=HTMLResponse)

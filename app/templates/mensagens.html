@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Mensagens · Come Doce{% endblock %}
+{% block content %}
+<section class="messages-page">
+  <header class="messages-heading"><span class="eyebrow">Conversas</span><h1>Mensagens</h1><p>Converse diretamente com compradores e vendedores.</p></header>
+  {% if conversas %}
+    <div class="conversation-list">
+      {% for conversa in conversas %}
+        <a class="conversation-card{% if conversa.nao_lidas %} has-unread{% endif %}" href="/mensagens/{{ conversa.id }}">
+          {% if conversa.pessoa and conversa.pessoa.foto %}<img src="/uploads/profile_photos/{{ conversa.pessoa.foto }}" alt="Foto de {{ conversa.pessoa.nome }}">{% else %}<span class="conversation-avatar" aria-hidden="true">{{ conversa.pessoa.nome[:1] | upper if conversa.pessoa else '?' }}</span>{% endif %}
+          <span class="conversation-summary"><strong>{{ conversa.pessoa.nome if conversa.pessoa else 'Conta indisponível' }}</strong><small>{{ conversa.ultima.texto if conversa.ultima else 'Conversa iniciada. Envie a primeira mensagem.' }}</small></span>
+          {% if conversa.nao_lidas %}<span class="unread-count" aria-label="{{ conversa.nao_lidas }} mensagens não lidas">{{ conversa.nao_lidas }}</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}<div class="messages-empty"><span aria-hidden="true">✉️</span><h2>Nenhuma conversa</h2><p>Abra a página de um vendedor e escolha “Enviar mensagem”.</p></div>{% endif %}
+</section>
+{% endblock %}

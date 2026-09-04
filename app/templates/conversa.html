@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Conversa com {{ pessoa.nome }} · Come Doce{% endblock %}
+{% block content %}
+<section class="chat-page">
+  <a class="back-link" href="/mensagens">← Voltar para Mensagens</a>
+  <header class="chat-header">
+    {% if pessoa.foto %}<img src="/uploads/profile_photos/{{ pessoa.foto }}" alt="Foto de {{ pessoa.nome }}">{% else %}<span class="conversation-avatar" aria-hidden="true">{{ pessoa.nome[:1] | upper }}</span>{% endif %}
+    <div><span class="eyebrow">Conversa com</span><h1>{{ pessoa.nome }}</h1></div>
+  </header>
+  <div class="chat-messages" aria-live="polite">
+    {% if mensagens %}{% for mensagem in mensagens %}<article class="chat-bubble {{ 'is-mine' if mensagem.minha else 'is-theirs' }}"><p>{{ mensagem.texto }}</p><time>{{ mensagem.horario }}</time></article>{% endfor %}{% else %}<p class="chat-empty">Nenhuma mensagem ainda. Comece a conversa abaixo.</p>{% endif %}
+  </div>
+  {% if erro %}<div class="form-errors" role="alert">Escreva uma mensagem de até {{ max_message_length }} caracteres.</div>{% endif %}
+  <form class="message-form" method="post" action="/mensagens/{{ conversa_id }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label class="field-label" for="messageText">Mensagem</label>
+    <textarea id="messageText" name="texto" maxlength="{{ max_message_length }}" rows="3" required placeholder="Escreva sua mensagem..."></textarea>
+    <button class="button" type="submit">Enviar mensagem</button>
+  </form>
+</section>
+{% endblock %}
