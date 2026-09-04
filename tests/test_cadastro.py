@@ -18,7 +18,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, ItemPedido, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, ItemCarrinho, ItemPedido, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -541,6 +541,8 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
                 "nome": "Brigadeiro especial",
                 "descricao": "Brigadeiro artesanal com chocolate.",
                 "valor": "7,50",
+                "quantidade_desconto": "3",
+                "valor_desconto": "4,00",
                 "focus_x": "0.70",
                 "focus_y": "0.45",
                 "subcategorias": ["Chocolate", "Morango", "Leite ninho"],
@@ -555,6 +557,8 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
             product = database.scalar(select(Produto).where(Produto.vendedor_id == seller.id))
             assert product is not None
             assert product.valor_centavos == 750
+            assert product.quantidade_desconto == 3
+            assert product.valor_desconto_centavos == 400
             assert product.aceita_fiado is False
             assert product.com_entrega is False
             assert [variation.nome for variation in product.variacoes] == ["Chocolate", "Morango", "Leite ninho"]
@@ -571,6 +575,7 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
         assert "Chocolate" in clean_page.text
         assert "Morango" in clean_page.text
         assert "Leite ninho" in clean_page.text
+        assert "Comprando 3, ganhe R$ 4,00 de desconto." in clean_page.text
 
         updated_profile = client.get("/perfil")
         assert "1 produto cadastrado" in updated_profile.text
@@ -732,7 +737,7 @@ def test_customer_selects_multiple_product_variations() -> None:
     seller = create_test_user("sabores-vendedor@teste.com", "vendedor")
     buyer = create_test_user("sabores-comprador@teste.com", "comprador")
     with SessionLocal() as database:
-        product = Produto(vendedor_id=seller.id, nome="Bombom", descricao="Bombons artesanais", valor_centavos=400, aceita_fiado=True, com_entrega=True, imagem="bombom.webp")
+        product = Produto(vendedor_id=seller.id, nome="Bombom", descricao="Bombons artesanais", valor_centavos=400, quantidade_desconto=3, valor_desconto_centavos=400, aceita_fiado=True, com_entrega=True, imagem="bombom.webp")
         product.variacoes = [VariacaoProduto(nome="Chocolate"), VariacaoProduto(nome="Morango"), VariacaoProduto(nome="Leite ninho")]
         database.add(product)
         database.commit()
@@ -746,7 +751,73 @@ def test_customer_selects_multiple_product_variations() -> None:
         assert "Chocolate" in storefront.text
         assert "Morango" in storefront.text
         assert "Leite ninho" in storefront.text
+        assert "Comprando 3, ganhe R$ 4,00 de desconto." in storefront.text
+        assert 'data-discount-quantity="3"' in storefront.text
+        assert 'data-unit-value-cents="400"' in storefront.text
+        assert 'data-discount-value-cents="400"' in storefront.text
         assert f'name="variacao_{variations["Morango"]}"' in storefront.text
+
+        added = client.post(
+            f"/produtos/{product.id}/carrinho",
+            data={"csrf": csrf_from(storefront), "pagar_depois": "true", f"variacao_{variations['Chocolate']}": "1", f"variacao_{variations['Morango']}": "2"},
+            follow_redirects=False,
+        )
+        assert added.status_code == 303
+        assert added.headers["location"] == f"/vendedores/{seller.id}?carrinho=1"
+        same_storefront = client.get(added.headers["location"])
+        assert "Produto adicionado ao carrinho!" in same_storefront.text
+        assert 'href="/carrinho">Ver carrinho</a>' in same_storefront.text
+        assert 'id="headerCart"' in same_storefront.text
+        assert 'id="sideMenuCart"' in same_storefront.text
+        assert client.get("/carrinho/quantidade").json() == {"quantidade": 3}
+        cart = client.get("/carrinho")
+        assert "Bombom" in cart.text
+        assert "Chocolate" in cart.text
+        assert "Morango" in cart.text
+        assert "R$ 8,00" in cart.text
+        assert "R$ 4,00 de desconto aplicado." in cart.text
+        assert "Subtotal</dt><dd>R$ 12,00" in cart.text
+        assert "Total</dt><dd>R$ 8,00" in cart.text
+        assert 'href="/carrinho"' in cart.text
+
+        with SessionLocal() as database:
+            cart_items = database.scalars(select(ItemCarrinho).where(ItemCarrinho.cliente_id == buyer.id).order_by(ItemCarrinho.id)).all()
+            assert [(item.variacao_id, item.quantidade) for item in cart_items] == [(variations["Chocolate"], 1), (variations["Morango"], 2)]
+            first_cart_item_id = cart_items[0].id
+        removed = client.post(f"/carrinho/itens/{first_cart_item_id}/remover", data={"csrf": csrf_from(cart)}, follow_redirects=False)
+        assert removed.status_code == 303
+        removed_cart = client.get(removed.headers["location"])
+        assert "Item removido do carrinho." in removed_cart.text
+        assert "Chocolate" not in removed_cart.text
+        assert "Morango" in removed_cart.text
+        assert "Adicione mais 1 item para conseguir R$ 4,00 de desconto." in removed_cart.text
+        assert client.get("/carrinho/quantidade").json() == {"quantidade": 2}
+
+        payment_started = client.post(
+            f"/carrinho/produtos/{product.id}/finalizar",
+            data={"csrf": csrf_from(removed_cart), "forma_pagamento": "agora"},
+            follow_redirects=False,
+        )
+        assert payment_started.status_code == 303
+        assert re.fullmatch(r"/pagamentos/pedidos/\d+", payment_started.headers["location"])
+        pending_order_id = int(payment_started.headers["location"].rsplit("/", 1)[1])
+        pending_cart = client.get("/carrinho")
+        assert "Anexe o comprovante." in pending_cart.text
+        assert f'action="/carrinho/pedidos/{pending_order_id}/pagar-depois"' in pending_cart.text
+        assert ">Pagar depois</button>" in pending_cart.text
+
+        pay_later = client.post(
+            f"/carrinho/pedidos/{pending_order_id}/pagar-depois",
+            data={"csrf": csrf_from(pending_cart)},
+            follow_redirects=False,
+        )
+        assert pay_later.status_code == 303
+        assert pay_later.headers["location"] == "/carrinho?pedido=1"
+        later_cart = client.get(pay_later.headers["location"])
+        assert "Pedido finalizado para pagar depois" in later_cart.text
+        later_history = client.get(f"/minhas-compras/vendedores/{seller.id}")
+        assert "Morango: 2" in later_history.text
+        assert client.get("/carrinho/quantidade").json() == {"quantidade": 0}
 
         purchase = client.post(
             f"/produtos/{product.id}/comprar",
@@ -763,9 +834,10 @@ def test_customer_selects_multiple_product_variations() -> None:
         assert "Leite ninho: 0" not in history.text
 
     with SessionLocal() as database:
-        order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product.id))
+        order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product.id, Pedido.quantidade == 3))
         assert order.quantidade == 3
-        assert order.valor_total_centavos == 1200
+        assert order.valor_total_centavos == 800
+        assert order.desconto_centavos == 400
         items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
         assert [(item.variacao_nome, item.quantidade) for item in items] == [("Chocolate", 1), ("Morango", 2)]
 
@@ -805,13 +877,30 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         login_page = buyer_client.get("/login")
         buyer_client.post("/login", data={"csrf": csrf_from(login_page), "email": buyer.email, "senha": "senha-segura"})
         storefront = buyer_client.get(f"/vendedores/{seller.id}")
-        purchase = buyer_client.post(
-            f"/produtos/{product.id}/comprar",
+        added_to_cart = buyer_client.post(
+            f"/produtos/{product.id}/carrinho",
             data={"csrf": csrf_from(storefront), "quantidade": "2"},
+            follow_redirects=False,
+        )
+        assert added_to_cart.status_code == 303
+        cart = buyer_client.get("/carrinho")
+        purchase = buyer_client.post(
+            f"/carrinho/produtos/{product.id}/finalizar",
+            data={"csrf": csrf_from(cart), "forma_pagamento": "agora"},
             follow_redirects=False,
         )
         assert purchase.status_code == 303
         assert re.fullmatch(r"/pagamentos/pedidos/\d+", purchase.headers["location"])
+        assert buyer_client.get("/carrinho/quantidade").json() == {"quantidade": 2}
+        pending_cart = buyer_client.get("/carrinho")
+        assert "Pagamento ainda não finalizado" in pending_cart.text
+        assert "Anexe o comprovante." in pending_cart.text
+        assert f'href="{purchase.headers["location"]}">Continuar pagamento</a>' in pending_cart.text
+        provisional_purchases = buyer_client.get("/minhas-compras")
+        assert "Cupcake" not in provisional_purchases.text
+        with SessionLocal() as database:
+            provisional_order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product.id))
+            assert provisional_order.confirmado is False
 
         payment = buyer_client.get(purchase.headers["location"])
         assert payment.status_code == 200
@@ -833,6 +922,9 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         )
         assert uploaded.status_code == 303
         assert uploaded.headers["location"] == f"{purchase.headers['location']}?comprovante=1"
+        assert buyer_client.get("/carrinho/quantidade").json() == {"quantidade": 0}
+        with SessionLocal() as database:
+            assert database.get(Pedido, provisional_order.id).confirmado is True
         receipt_page = buyer_client.get(uploaded.headers["location"])
         assert "Comprovante anexado" in receipt_page.text
         assert "não pode ser apagado ou substituído" in receipt_page.text

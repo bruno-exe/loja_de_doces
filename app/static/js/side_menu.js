@@ -40,4 +40,27 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && menu.classList.contains("is-open")) closeMenu();
   });
+
+  const headerCart = document.getElementById("headerCart");
+  const headerCartCount = document.getElementById("headerCartCount");
+  const sideMenuCart = document.getElementById("sideMenuCart");
+  if (headerCart && headerCartCount && sideMenuCart) {
+    fetch("/carrinho/quantidade", { headers: { Accept: "application/json" } })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((data) => {
+        const quantity = Number(data.quantidade) || 0;
+        if (quantity > 0) {
+          headerCartCount.textContent = String(quantity);
+          headerCart.hidden = false;
+          sideMenuCart.hidden = true;
+        } else {
+          headerCart.hidden = true;
+          sideMenuCart.hidden = false;
+        }
+      })
+      .catch(() => {
+        headerCart.hidden = true;
+        sideMenuCart.hidden = false;
+      });
+  }
 })();

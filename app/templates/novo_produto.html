@@ -28,6 +28,11 @@
       <label class="field-label">Valor
         <input name="valor" required inputmode="decimal" maxlength="20" value="{{ form.valor or '' }}" placeholder="Ex.: 5,00">
       </label>
+      <fieldset class="product-promotion-editor">
+        <legend>Promoção opcional</legend>
+        <p>Preencha os dois campos somente se quiser oferecer desconto por kit.</p>
+        <div><span>Comprando</span><input name="quantidade_desconto" type="number" min="2" max="99" value="{{ form.quantidade_desconto or '' }}" placeholder="3" inputmode="numeric"><span>ganha</span><input name="valor_desconto" inputmode="decimal" maxlength="20" value="{{ form.valor_desconto or '' }}" placeholder="4,00"><span>reais de desconto</span></div>
+      </fieldset>
       <label class="product-checkbox"><input type="checkbox" name="aceita_fiado" {% if form.aceita_fiado %}checked{% endif %}><span>Aceita venda fiada</span></label>
       <label class="product-checkbox"><input type="checkbox" name="com_entrega" {% if form.com_entrega %}checked{% endif %}><span>Com entrega</span></label>
       <fieldset class="product-variations-editor">

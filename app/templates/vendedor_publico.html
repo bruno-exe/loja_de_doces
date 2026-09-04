@@ -24,6 +24,7 @@
 
   <section class="seller-sweets-section">
     {% if request.query_params.get('pedido') == '1' %}<div class="product-created-success" role="status">Compra registrada com sucesso!</div>{% endif %}
+    {% if request.query_params.get('carrinho') == '1' %}<div class="product-created-success" role="status">Produto adicionado ao carrinho! <a href="/carrinho">Ver carrinho</a></div>{% endif %}
     <div class="seller-sweets-heading">
       <div><span class="eyebrow">Vitrine</span><h2>Doces de {{ vendedor.nome }}</h2></div>
       {% if vendedor.is_owner %}<a class="button button-small" href="/produtos/novo">Criar produto</a>{% endif %}
@@ -52,9 +53,10 @@
     <p id="purchaseDeliveryNote" class="purchase-option-note"></p>
     <div id="purchaseVariationOptions" class="purchase-variation-options"></div>
     <label id="purchaseQuantityBlock" class="field-label">Quantidade<input id="purchaseQuantity" type="number" name="quantidade" value="1" min="1" max="99" required inputmode="numeric"></label>
-    <button class="button" type="submit">Comprar</button>
+    <p id="purchasePromotionMessage" class="purchase-promotion-message" hidden></p>
+    <div class="purchase-submit-actions"><button id="addToCartButton" class="button button-secondary cart-add-button" type="submit">Adicionar ao carrinho</button><button class="button purchase-now-button" type="submit">Comprar agora</button></div>
   </form>
 </dialog>
-<script src="/static/js/purchase.js?v=20260901-1"></script>
+<script src="/static/js/purchase.js?v=20260903-promotions2"></script>
 {% endif %}
 {% endblock %}

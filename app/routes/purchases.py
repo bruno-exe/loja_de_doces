@@ -25,7 +25,7 @@ def purchases_page(request: Request):
         rows = database.execute(
             select(Usuario, func.sum(Pedido.quantidade))
             .join(Pedido, Pedido.vendedor_id == Usuario.id)
-            .where(Pedido.cliente_id == usuario.id)
+            .where(Pedido.cliente_id == usuario.id, Pedido.confirmado.is_(True))
             .group_by(Usuario.id)
             .order_by(Usuario.nome, Usuario.id)
         ).all()
@@ -47,7 +47,7 @@ def seller_purchases_page(request: Request, seller_id: int):
         seller = database.scalar(select(Usuario).where(Usuario.id == seller_id, Usuario.tipo_conta == "vendedor"))
         rows = database.execute(
             select(Pedido, Produto).outerjoin(Produto, Produto.id == Pedido.produto_id)
-            .where(Pedido.cliente_id == usuario.id, Pedido.vendedor_id == seller_id)
+            .where(Pedido.cliente_id == usuario.id, Pedido.vendedor_id == seller_id, Pedido.confirmado.is_(True))
             .order_by(Pedido.id.desc())
         ).all()
         if seller is None or not rows:

@@ -17,6 +17,8 @@ from .routes.products import router as products_router
 from .routes.purchases import router as purchases_router
 from .routes.sales import router as sales_router
 from .routes.payments import router as payments_router
+from .routes.cart import router as cart_router
+from .routes.availability import router as availability_router
 from .security import csrf_token
 from .session import current_user
 
@@ -46,6 +48,20 @@ async def lifespan(_: FastAPI):
             connection.execute(text("ALTER TABLE pedidos ADD COLUMN produto_descricao TEXT"))
         if "produto_imagem" not in order_columns:
             connection.execute(text("ALTER TABLE pedidos ADD COLUMN produto_imagem VARCHAR(255)"))
+        if "desconto_centavos" not in order_columns:
+            connection.execute(text("ALTER TABLE pedidos ADD COLUMN desconto_centavos INTEGER NOT NULL DEFAULT 0"))
+        if "confirmado" not in order_columns:
+            connection.execute(text("ALTER TABLE pedidos ADD COLUMN confirmado BOOLEAN NOT NULL DEFAULT 1"))
+    product_columns = {column["name"] for column in inspect(engine).get_columns("produtos")}
+    with engine.begin() as connection:
+        if "quantidade_desconto" not in product_columns:
+            connection.execute(text("ALTER TABLE produtos ADD COLUMN quantidade_desconto INTEGER"))
+        if "valor_desconto_centavos" not in product_columns:
+            connection.execute(text("ALTER TABLE produtos ADD COLUMN valor_desconto_centavos INTEGER"))
+    cart_columns = {column["name"] for column in inspect(engine).get_columns("itens_carrinho")}
+    if "pedido_pendente_id" not in cart_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE itens_carrinho ADD COLUMN pedido_pendente_id INTEGER"))
     receipt_columns = {column["name"] for column in inspect(engine).get_columns("comprovantes_pagamentos")}
     receipt_migrations = {
         "ocr_valor": "VARCHAR(40)", "ocr_data": "VARCHAR(10)", "ocr_hora": "VARCHAR(5)",
@@ -84,6 +100,8 @@ app.include_router(products_router)
 app.include_router(purchases_router)
 app.include_router(sales_router)
 app.include_router(payments_router)
+app.include_router(cart_router)
+app.include_router(availability_router)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -57,6 +57,8 @@ class Produto(Base):
     nome: Mapped[str] = mapped_column(String(120))
     descricao: Mapped[str] = mapped_column(Text)
     valor_centavos: Mapped[int] = mapped_column(Integer)
+    quantidade_desconto: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    valor_desconto_centavos: Mapped[int | None] = mapped_column(Integer, nullable=True)
     aceita_fiado: Mapped[bool] = mapped_column(Boolean, default=False)
     com_entrega: Mapped[bool] = mapped_column(Boolean, default=False)
     imagem: Mapped[str] = mapped_column(String(255))
@@ -94,10 +96,12 @@ class Pedido(Base):
     valor_unitario_centavos: Mapped[int] = mapped_column(Integer)
     quantidade: Mapped[int] = mapped_column(Integer)
     valor_total_centavos: Mapped[int] = mapped_column(Integer)
+    desconto_centavos: Mapped[int] = mapped_column(Integer, default=0)
     pagar_depois: Mapped[bool] = mapped_column(Boolean, default=False)
     entregar_aqui: Mapped[bool] = mapped_column(Boolean, default=False)
     pago: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="recebido")
+    confirmado: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     itens: Mapped[list["ItemPedido"]] = relationship(
         back_populates="pedido", cascade="all, delete-orphan", order_by="ItemPedido.id"
@@ -114,6 +118,22 @@ class ItemPedido(Base):
     variacao_nome: Mapped[str] = mapped_column(String(120))
     quantidade: Mapped[int] = mapped_column(Integer)
     pedido: Mapped[Pedido] = relationship(back_populates="itens")
+
+
+class ItemCarrinho(Base):
+    __tablename__ = "itens_carrinho"
+    __table_args__ = (CheckConstraint("quantidade BETWEEN 1 AND 99", name="ck_itens_carrinho_quantidade"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id"), index=True)
+    variacao_id: Mapped[int | None] = mapped_column(ForeignKey("variacoes_produtos.id"), nullable=True, index=True)
+    pedido_pendente_id: Mapped[int | None] = mapped_column(ForeignKey("pedidos.id"), nullable=True, index=True)
+    quantidade: Mapped[int] = mapped_column(Integer)
+    pagar_depois: Mapped[bool] = mapped_column(Boolean, default=False)
+    entregar_aqui: Mapped[bool] = mapped_column(Boolean, default=False)
+    adicionado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class VisitaPerfilVendedor(Base):

@@ -34,8 +34,8 @@
         <p id="accountChoiceWarning" class="account-choice-warning" role="alert" hidden>Escolha Comprador ou Vendedor para criar sua conta.</p>
       </fieldset>
 
-      <label class="field-label">Nome
-        <input type="text" name="nome" required minlength="2" maxlength="100" autocomplete="name" value="{{ form.nome or '' }}" placeholder="Seu nome">
+      <label class="field-label"><span id="nameFieldLabel">Nome</span>
+        <input id="nameFieldInput" type="text" name="nome" required minlength="2" maxlength="100" autocomplete="name" value="{{ form.nome or '' }}" placeholder="Seu nome">
       </label>
       <label class="field-label">E-mail
         <input type="email" name="email" required maxlength="320" autocomplete="email" value="{{ form.email or '' }}" placeholder="voce@exemplo.com">
@@ -59,6 +59,8 @@
   const accountInputs = document.querySelectorAll('input[name="tipo_conta"]');
   const accountWarning = document.querySelector('#accountChoiceWarning');
   const createAccountButton = document.querySelector('#createAccountButton');
+  const nameFieldLabel = document.querySelector('#nameFieldLabel');
+  const nameFieldInput = document.querySelector('#nameFieldInput');
 
   function hasSelectedAccountType() {
     return Array.from(accountInputs).some((input) => input.checked);
@@ -68,11 +70,14 @@
     const selectedAccount = Array.from(accountInputs).find((input) => input.checked);
     if (!selectedAccount) {
       createAccountButton.textContent = 'Criar minha conta';
+      nameFieldLabel.textContent = 'Nome';
+      nameFieldInput.placeholder = 'Seu nome';
       return;
     }
-    createAccountButton.textContent = selectedAccount.value === 'vendedor'
-      ? 'Criar conta vendedor'
-      : 'Criar conta comprador';
+    const isSeller = selectedAccount.value === 'vendedor';
+    createAccountButton.textContent = isSeller ? 'Criar conta vendedor' : 'Criar conta comprador';
+    nameFieldLabel.textContent = isSeller ? 'Nome da loja' : 'Nome';
+    nameFieldInput.placeholder = isSeller ? 'O nome da sua loja' : 'Seu nome';
   }
 
   registrationForm.addEventListener('submit', (event) => {

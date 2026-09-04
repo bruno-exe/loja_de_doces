@@ -3,6 +3,7 @@
 {% block content %}
 <section class="purchases-page">
   <a class="back-link" href="/minhas-compras">← Voltar para Minhas compras</a>
+  {% if request.query_params.get('pedido') == '1' %}<div class="product-created-success" role="status">Pedido finalizado e adicionado às suas compras.</div>{% endif %}
   <header class="purchase-history-seller">
     {% if vendedor.foto %}<img src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem de {{ vendedor.nome }}">{% else %}<span class="purchase-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</span>{% endif %}
     <div><span class="eyebrow">Compras feitas com</span><h1>{{ vendedor.nome }}</h1></div>

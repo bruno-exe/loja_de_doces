@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Carrinho · Come Doce{% endblock %}
+{% block content %}
+<section class="cart-page">
+  <header class="cart-heading"><span class="eyebrow">Seus doces</span><h1>Carrinho</h1><p>Confira os doces que você separou antes de concluir a compra.</p></header>
+  {% if request.query_params.get('adicionado') %}<div class="product-created-success" role="status">Produto adicionado ao carrinho!</div>{% endif %}
+  {% if request.query_params.get('removido') %}<div class="product-created-success" role="status">Item removido do carrinho.</div>{% endif %}
+  {% if request.query_params.get('pedido') %}<div class="product-created-success" role="status">Pedido finalizado para pagar depois e adicionado às suas compras.</div>{% endif %}
+  {% if request.query_params.get('indisponivel') %}<div class="form-errors" role="alert">Este produto ou um dos sabores escolhidos não está mais disponível. Remova o item pausado ou aguarde o vendedor ativá-lo novamente.</div>{% endif %}
+  {% if produtos %}
+    <div class="cart-items-list">
+      {% for produto in produtos %}
+        <article class="cart-item-card">
+          <img src="/uploads/products/{{ produto.imagem }}" alt="{{ produto.produto }}">
+          <div class="cart-item-info"><small>Vendido por <a href="/vendedores/{{ produto.vendedor_id }}">{{ produto.vendedor }}</a></small><h2>{{ produto.produto }}</h2><span>{{ produto.quantidade }} {{ 'unidade' if produto.quantidade == 1 else 'unidades' }}</span><ul class="cart-variation-items">{% for item in produto.itens %}<li><span>{{ item.variacao or produto.produto }}: {{ item.quantidade }}</span><form method="post" action="/carrinho/itens/{{ item.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button type="submit">Remover</button></form></li>{% endfor %}</ul>{% if produto.desconto_centavos %}<strong class="cart-product-discount">Desconto: - {{ produto.desconto }}</strong>{% endif %}</div>
+          <div class="cart-item-actions"><strong>{{ produto.total }}</strong></div>
+          {% if not produto.disponivel %}<div class="cart-checkout-actions cart-unavailable"><strong>Item indisponível</strong><small>O vendedor pausou este produto ou sabor. Você pode removê-lo ou aguardar a reativação.</small></div>{% elif produto.pedido_pendente_id %}<div class="cart-checkout-actions cart-payment-started"><span>Pagamento ainda não finalizado</span><small>Anexe o comprovante.</small><a class="button" href="/pagamentos/pedidos/{{ produto.pedido_pendente_id }}">Continuar pagamento</a>{% if produto.aceita_fiado %}<form method="post" action="/carrinho/pedidos/{{ produto.pedido_pendente_id }}/pagar-depois"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary" type="submit">Pagar depois</button></form>{% endif %}</div>{% else %}<form class="cart-checkout-actions" method="post" action="/carrinho/produtos/{{ produto.id }}/finalizar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><span>Finalizar pedido</span><button class="button" type="submit" name="forma_pagamento" value="agora">Pagar agora</button>{% if produto.aceita_fiado %}<button class="button button-secondary" type="submit" name="forma_pagamento" value="depois">Pagar depois</button>{% else %}<small>Este produto não aceita pagamento posterior.</small>{% endif %}</form>{% endif %}
+        </article>
+      {% endfor %}
+    </div>
+    {% if promocoes %}<div class="cart-promotions">{% for promocao in promocoes %}<div><strong>{{ promocao.produto }}</strong>{% if promocao.desconto %}<span>{{ promocao.desconto }} de desconto aplicado.</span>{% endif %}{% if promocao.faltam %}<span>Adicione mais {{ promocao.faltam }} {{ 'item' if promocao.faltam == 1 else 'itens' }} para conseguir {{ promocao.desconto_kit }} de desconto.</span>{% endif %}</div>{% endfor %}</div>{% endif %}
+    <dl class="cart-totals"><div><dt>Subtotal</dt><dd>{{ resumo.subtotal }}</dd></div><div><dt>Descontos</dt><dd>- {{ resumo.desconto }}</dd></div><div><dt>Total</dt><dd>{{ resumo.total }}</dd></div></dl>
+    <div class="cart-next-step"><p>A finalização conjunta dos itens será adicionada na próxima etapa.</p><a class="button button-secondary" href="/doces">Continuar comprando</a></div>
+  {% else %}
+    <div class="purchases-empty"><span aria-hidden="true">🛒</span><h2>Seu carrinho está vazio</h2><p>Escolha um vendedor e adicione seus doces.</p><a class="button" href="/doces">Ver doces</a></div>
+  {% endif %}
+</section>
+{% endblock %}

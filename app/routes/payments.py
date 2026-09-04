@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal
-from ..models import ComprovantePagamento, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario
+from ..models import ComprovantePagamento, ItemCarrinho, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..services.pix_receipt_ocr import PixReceiptOcrError, extract_pix_receipt
@@ -83,6 +83,7 @@ def payment_page(request: Request, order_id: int):
         "quantidade": order.quantidade,
         "valor_unitario": format_price(order.valor_unitario_centavos),
         "valor_total": format_price(order.valor_total_centavos),
+        "desconto": format_price(order.desconto_centavos) if order.desconto_centavos else None,
         "pago": order.pago,
         "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in order_items],
         "comprovante": {"id": receipt.id, "enviado_em": receipt.enviado_em.strftime("%d/%m/%Y às %H:%M"), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro} if receipt else None,
@@ -124,6 +125,14 @@ async def upload_payment_receipt(request: Request, order_id: int, comprovante: U
         with SessionLocal() as database:
             receipt = ComprovantePagamento(pedido_id=order_id, cliente_id=user.id, arquivo=filename)
             database.add(receipt)
+            pending_cart_items = database.scalars(
+                select(ItemCarrinho).where(ItemCarrinho.cliente_id == user.id, ItemCarrinho.pedido_pendente_id == order_id)
+            ).all()
+            for cart_item in pending_cart_items:
+                database.delete(cart_item)
+            order = database.get(Pedido, order_id)
+            if order:
+                order.confirmado = True
             database.commit()
             database.refresh(receipt)
             receipt_id = receipt.id

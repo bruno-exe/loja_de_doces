@@ -12,12 +12,13 @@
         <h3>{{ doce.nome }}</h3>
         <p>{{ doce.descricao }}</p>
         <strong class="product-price">{{ doce.valor }}</strong>
+        {% if doce.quantidade_desconto and doce.valor_desconto %}<p class="product-promotion-label">Comprando {{ doce.quantidade_desconto }}, ganhe {{ doce.valor_desconto }} de desconto.</p>{% endif %}
         {% if doce.variacoes %}<ul class="product-variation-summary">{% for variacao in doce.variacoes %}<li>{{ variacao.nome }}</li>{% endfor %}</ul>{% endif %}
         <div class="product-options">
           {% if doce.aceita_fiado %}<span>Aceita venda fiada</span>{% endif %}
           {% if doce.com_entrega %}<span>Com entrega</span>{% endif %}
         </div>
-        {% if can_buy_products %}<button class="button product-buy-button" type="button" data-buy-product data-product-id="{{ doce.id }}" data-product-name="{{ doce.nome }}" data-has-variations="{{ 'true' if doce.variacoes else 'false' }}" data-accepts-credit="{{ 'true' if doce.aceita_fiado else 'false' }}" data-has-delivery="{{ 'true' if doce.com_entrega else 'false' }}">Comprar</button>
+        {% if can_buy_products %}<button class="button product-buy-button" type="button" data-buy-product data-product-id="{{ doce.id }}" data-product-name="{{ doce.nome }}" data-has-variations="{{ 'true' if doce.variacoes else 'false' }}" data-unit-value-cents="{{ doce.valor_centavos }}" data-discount-quantity="{{ doce.quantidade_desconto or 0 }}" data-discount-value="{{ doce.valor_desconto or '' }}" data-discount-value-cents="{{ doce.valor_desconto_centavos or 0 }}" data-accepts-credit="{{ 'true' if doce.aceita_fiado else 'false' }}" data-has-delivery="{{ 'true' if doce.com_entrega else 'false' }}">Comprar</button>
         {% if doce.variacoes %}<template id="purchaseVariations{{ doce.id }}">{% for variacao in doce.variacoes %}<label class="purchase-variation-row"><span>{{ variacao.nome }}</span><input type="number" name="variacao_{{ variacao.id }}" value="0" min="0" max="99" inputmode="numeric" aria-label="Quantidade de {{ variacao.nome }}"></label>{% endfor %}</template>{% endif %}{% endif %}
       </div>
     </article>

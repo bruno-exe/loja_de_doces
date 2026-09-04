@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from ..database import SessionLocal
-from ..models import ItemPedido, Pedido, Produto, Usuario, VariacaoProduto
+from ..models import ItemCarrinho, ItemPedido, Pedido, Produto, Usuario, VariacaoProduto
 from ..security import csrf_token, validate_csrf
 from ..services.profile_photo import ProfilePhotoError, process_seller_image
 from ..session import current_user
@@ -32,6 +32,10 @@ def product_card(product: Produto) -> dict:
         "nome": product.nome,
         "descricao": product.descricao,
         "valor": format_price(product.valor_centavos),
+        "valor_centavos": product.valor_centavos,
+        "quantidade_desconto": product.quantidade_desconto,
+        "valor_desconto_centavos": product.valor_desconto_centavos,
+        "valor_desconto": format_price(product.valor_desconto_centavos) if product.valor_desconto_centavos else None,
         "aceita_fiado": product.aceita_fiado,
         "com_entrega": product.com_entrega,
         "imagem": product.imagem,
@@ -46,7 +50,8 @@ def seller_products(seller_id: int) -> list[dict]:
             .where(Produto.vendedor_id == seller_id, Produto.ativo.is_(True))
             .order_by(Produto.id.desc())
         ).all()
-        return [product_card(product) for product in products]
+        cards = [product_card(product) for product in products]
+        return [card for product, card in zip(products, cards) if not product.variacoes or card["variacoes"]]
 
 
 def parse_price(value: str) -> int | None:
@@ -104,6 +109,8 @@ async def create_product(
     nome: str = Form(...),
     descricao: str = Form(...),
     valor: str = Form(...),
+    quantidade_desconto: str = Form(""),
+    valor_desconto: str = Form(""),
     aceita_fiado: bool = Form(False),
     com_entrega: bool = Form(False),
     subcategorias: list[str] = Form([]),
@@ -122,6 +129,8 @@ async def create_product(
     nome = " ".join(nome.strip().split())
     descricao = descricao.strip()
     price_in_cents = parse_price(valor)
+    discount_quantity = None
+    discount_in_cents = None
     errors: list[str] = []
     if len(nome) < 2 or len(nome) > 120:
         errors.append("O nome do produto deve ter entre 2 e 120 caracteres.")
@@ -129,6 +138,16 @@ async def create_product(
         errors.append("A descrição deve ter entre 2 e 1000 caracteres.")
     if price_in_cents is None:
         errors.append("Informe um valor válido maior que zero, com no máximo duas casas decimais.")
+    if quantidade_desconto.strip() or valor_desconto.strip():
+        try:
+            discount_quantity = int(quantidade_desconto.strip())
+        except ValueError:
+            discount_quantity = None
+        discount_in_cents = parse_price(valor_desconto)
+        if discount_quantity is None or not 2 <= discount_quantity <= 99 or discount_in_cents is None:
+            errors.append("Para criar a promoção, informe uma quantidade entre 2 e 99 e um desconto válido.")
+        elif price_in_cents is not None and discount_in_cents >= price_in_cents * discount_quantity:
+            errors.append("O desconto deve ser menor que o valor total do kit.")
     if imagem.content_type not in {"image/jpeg", "image/png", "image/webp"}:
         errors.append("Use uma imagem JPG, PNG ou WebP.")
     if (focus_x is None) != (focus_y is None) or (focus_x is not None and not 0 <= focus_x <= 1) or (focus_y is not None and not 0 <= focus_y <= 1):
@@ -153,6 +172,8 @@ async def create_product(
         "nome": nome,
         "descricao": descricao,
         "valor": valor,
+        "quantidade_desconto": quantidade_desconto,
+        "valor_desconto": valor_desconto,
         "aceita_fiado": aceita_fiado,
         "com_entrega": com_entrega,
         "subcategorias": variation_names,
@@ -184,6 +205,8 @@ async def create_product(
                     nome=nome,
                     descricao=descricao,
                     valor_centavos=price_in_cents,
+                    quantidade_desconto=discount_quantity,
+                    valor_desconto_centavos=discount_in_cents,
                     aceita_fiado=aceita_fiado,
                     com_entrega=com_entrega,
                     imagem=filename,
@@ -273,6 +296,7 @@ async def buy_product(
         if quantidade < 1 or quantidade > 99:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
 
+        discount_total = (quantidade // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
         order = Pedido(
                 cliente_id=usuario.id,
                 vendedor_id=product.vendedor_id,
@@ -282,7 +306,8 @@ async def buy_product(
                 produto_imagem=product.imagem,
                 valor_unitario_centavos=product.valor_centavos,
                 quantidade=quantidade,
-                valor_total_centavos=product.valor_centavos * quantidade,
+                valor_total_centavos=product.valor_centavos * quantidade - discount_total,
+                desconto_centavos=discount_total,
                 pagar_depois=pagar_depois,
                 entregar_aqui=entregar_aqui,
                 pago=False,
@@ -306,3 +331,65 @@ async def buy_product(
 
     destination = f"/vendedores/{seller_id}?pedido=1" if pagar_depois else f"/pagamentos/pedidos/{order_id}"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/produtos/{product_id}/carrinho")
+async def add_product_to_cart(
+    request: Request,
+    product_id: int,
+    quantidade: int = Form(0),
+    pagar_depois: bool = Form(False),
+    entregar_aqui: bool = Form(False),
+    csrf: str = Form(...),
+):
+    validate_csrf(request, csrf)
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    with SessionLocal() as database:
+        product = database.scalar(
+            select(Produto).join(Usuario, Usuario.id == Produto.vendedor_id)
+            .where(Produto.id == product_id, Produto.ativo.is_(True), Usuario.ativo.is_(True))
+        )
+        if product is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+        if product.vendedor_id == user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Você não pode adicionar seu próprio produto ao carrinho.")
+        if pagar_depois and not product.aceita_fiado:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não aceita pagamento posterior.")
+        if entregar_aqui and not product.com_entrega:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não possui entrega.")
+
+        active_variations = [variation for variation in product.variacoes if variation.ativo]
+        selected: list[tuple[int | None, int]] = []
+        if active_variations:
+            submitted_form = await request.form()
+            for variation in active_variations:
+                try:
+                    selected_quantity = int(str(submitted_form.get(f"variacao_{variation.id}", "0")).strip())
+                except ValueError:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
+                if selected_quantity < 0 or selected_quantity > 99:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
+                if selected_quantity:
+                    selected.append((variation.id, selected_quantity))
+        else:
+            selected.append((None, quantidade))
+        total_quantity = sum(item[1] for item in selected)
+        if total_quantity < 1 or total_quantity > 99:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
+
+        for variation_id, selected_quantity in selected:
+            filters = [ItemCarrinho.cliente_id == user.id, ItemCarrinho.produto_id == product.id, ItemCarrinho.pedido_pendente_id.is_(None)]
+            filters.append(ItemCarrinho.variacao_id == variation_id if variation_id is not None else ItemCarrinho.variacao_id.is_(None))
+            existing = database.scalar(select(ItemCarrinho).where(*filters))
+            if existing:
+                if existing.quantidade + selected_quantity > 99:
+                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="A quantidade deste item no carrinho ultrapassaria 99.")
+                existing.quantidade += selected_quantity
+                existing.pagar_depois = pagar_depois
+                existing.entregar_aqui = entregar_aqui
+            else:
+                database.add(ItemCarrinho(cliente_id=user.id, vendedor_id=product.vendedor_id, produto_id=product.id, variacao_id=variation_id, quantidade=selected_quantity, pagar_depois=pagar_depois, entregar_aqui=entregar_aqui))
+        database.commit()
+    return RedirectResponse(f"/vendedores/{product.vendedor_id}?carrinho=1", status_code=status.HTTP_303_SEE_OTHER)

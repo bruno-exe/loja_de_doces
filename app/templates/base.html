@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Come Doce: um espaço para compradores e vendedores de doces.">
   <title>{% block title %}Come Doce{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260902-variations1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260903-pause1">
 </head>
 <body{% if usuario %} class="authenticated-page"{% endif %}>
   <header class="site-header{% if usuario %} authenticated-header{% endif %}">
@@ -18,6 +18,7 @@
     </a>
     {% if usuario %}
       <span class="header-spacer"></span>
+      <a id="headerCart" class="header-cart-link" href="/carrinho" aria-label="Abrir carrinho" hidden><span aria-hidden="true">&#128722;</span><span>Carrinho</span><strong id="headerCartCount">0</strong></a>
       <form class="logout-form header-logout" method="post" action="/logout">
         <input type="hidden" name="csrf" value="{{ csrf_token }}">
         <button class="nav-logout" type="submit">Sair</button>
@@ -43,7 +44,9 @@
         <a href="/perfil" {% if request.url.path == '/perfil' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128100;</span> Meu perfil</a>
         <a href="/doces" {% if request.url.path == '/doces' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#129473;</span> Doces</a>
         <a href="/minhas-compras" {% if request.url.path.startswith('/minhas-compras') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Minhas compras</a>
+        <a id="sideMenuCart" href="/carrinho" {% if request.url.path == '/carrinho' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Carrinho</a>
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/vendas" {% if request.url.path.startswith('/vendas') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128200;</span> Vendas</a>{% endif %}
+        {% if usuario.tipo_conta == 'vendedor' %}<a href="/pausar" {% if request.url.path == '/pausar' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9208;</span> Pausar</a>{% endif %}
       </div>
     </nav>
   {% endif %}
@@ -53,6 +56,6 @@
   <footer class="site-footer">
     <p>&copy; 2026 Come Doce. TI eng. computação.</p>
   </footer>
-  {% if usuario %}<script src="/static/js/side_menu.js?v=20260901-1"></script>{% endif %}
+  {% if usuario %}<script src="/static/js/side_menu.js?v=20260903-cart-location1"></script>{% endif %}
 </body>
 </html>

@@ -11,7 +11,7 @@
   <article class="payment-order-card">
     {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% endif %}
     <div class="payment-order-description"><h2>{{ pedido.nome }}</h2><p>{{ pedido.descricao }}</p>{% if pedido.itens %}<ul class="order-variation-list">{% for item in pedido.itens %}<li>{{ item.nome }}: {{ item.quantidade }}</li>{% endfor %}</ul>{% endif %}<span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.valor_unitario }} cada</span></div>
-    <strong>{{ pedido.valor_total }}</strong>
+    <div class="payment-order-total">{% if pedido.desconto %}<small>Desconto: - {{ pedido.desconto }}</small>{% endif %}<strong>{{ pedido.valor_total }}</strong></div>
   </article>
 
   <section class="pix-payment-card">

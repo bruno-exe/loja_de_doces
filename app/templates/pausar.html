@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Pausar itens · Come Doce{% endblock %}
+{% block content %}
+<section class="availability-page">
+  <header class="availability-heading"><span class="eyebrow">Disponibilidade</span><h1>Pausar</h1><p>Pause um doce ou sabor quando ele acabar. Você poderá ativá-lo novamente a qualquer momento.</p></header>
+  {% if produtos %}<div class="availability-list">{% for produto in produtos %}<article class="availability-product"><h2>{{ produto.nome }}</h2><div>{% if produto.variacoes %}{% for variacao in produto.variacoes %}<div class="availability-row"><span>{{ variacao.nome }}</span><form method="post" action="/pausar/variacoes/{{ variacao.id }}"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="{{ 'is-paused' if not variacao.ativo else '' }}" type="submit">{{ 'Ativar' if not variacao.ativo else 'Pausar' }}</button></form></div>{% endfor %}{% else %}<div class="availability-row"><span>Produto principal</span><form method="post" action="/pausar/produtos/{{ produto.id }}"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="{{ 'is-paused' if not produto.ativo else '' }}" type="submit">{{ 'Ativar' if not produto.ativo else 'Pausar' }}</button></form></div>{% endif %}</div></article>{% endfor %}</div>{% else %}<div class="purchases-empty"><h2>Nenhum produto cadastrado</h2><p>Cadastre um doce antes de controlar sua disponibilidade.</p><a class="button" href="/produtos/novo">Criar produto</a></div>{% endif %}
+</section>
+{% endblock %}

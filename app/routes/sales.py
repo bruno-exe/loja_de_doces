@@ -36,7 +36,7 @@ def sales_page(request: Request):
         rows = database.execute(
             select(Pedido, Usuario)
             .join(Usuario, Usuario.id == Pedido.cliente_id)
-            .where(Pedido.vendedor_id == seller.id)
+            .where(Pedido.vendedor_id == seller.id, Pedido.confirmado.is_(True))
             .order_by(Usuario.nome, Pedido.id)
         ).all()
 
@@ -64,7 +64,7 @@ def customer_sales_page(request: Request, customer_id: int):
         rows = database.execute(
             select(Pedido, Produto)
             .outerjoin(Produto, Produto.id == Pedido.produto_id)
-            .where(Pedido.vendedor_id == seller.id, Pedido.cliente_id == customer_id)
+            .where(Pedido.vendedor_id == seller.id, Pedido.cliente_id == customer_id, Pedido.confirmado.is_(True))
             .order_by(Pedido.criado_em.desc(), Pedido.id.desc())
         ).all()
     if customer is None or not rows:
