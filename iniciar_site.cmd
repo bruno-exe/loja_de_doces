@@ -28,7 +28,7 @@ if not exist "%VENV_PYTHON%" (
   if errorlevel 1 goto :erro
 )
 
-"%VENV_PYTHON%" -c "import fastapi, uvicorn, jinja2, sqlalchemy, multipart, argon2, itsdangerous, email_validator, PIL, numpy, cv2, httpx, dotenv, pytesseract" >nul 2>nul
+"%VENV_PYTHON%" -c "import fastapi, uvicorn, jinja2, sqlalchemy, multipart, argon2, itsdangerous, email_validator, PIL, numpy, cv2, httpx, dotenv, pytesseract, tzdata" >nul 2>nul
 if errorlevel 1 (
   echo Instalando dependencias...
   "%VENV_PYTHON%" -m pip install -r "%~dp0requirements.txt"

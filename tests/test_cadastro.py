@@ -26,6 +26,7 @@ from app.routes import payments as payment_routes
 from app.routes.point_deposits import credit_confirmed_payment, parse_brl
 from app.services.mercadopago_points import PaymentResult
 from app.config import settings
+from app.timezone_utils import format_brasilia_datetime
 from app.services.profile_photo import process_profile_photo, process_seller_image
 
 
@@ -1064,3 +1065,10 @@ def test_confirmed_point_deposit_credits_once() -> None:
         entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.deposito_id == deposit.id)).all()
         assert len(entries) == 1
         assert entries[0].quantidade == 1000
+
+
+def test_formats_database_times_in_brasilia_timezone() -> None:
+    utc_time = datetime(2026, 9, 4, 15, 30, tzinfo=timezone.utc)
+    assert format_brasilia_datetime(utc_time) == "04/09/2026 às 12:30"
+    # O SQLite devolve datas sem tzinfo; elas continuam sendo interpretadas como UTC.
+    assert format_brasilia_datetime(utc_time.replace(tzinfo=None)) == "04/09/2026 às 12:30"

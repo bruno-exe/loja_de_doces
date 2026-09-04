@@ -10,6 +10,7 @@ from ..database import SessionLocal
 from ..models import Conversa, Mensagem, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
+from ..timezone_utils import format_brasilia_datetime
 
 
 router = APIRouter()
@@ -117,7 +118,7 @@ def conversation_page(request: Request, conversation_id: int):
         message_data = [{
             "texto": message.texto,
             "minha": message.remetente_id == usuario.id,
-            "horario": message.enviada_em.strftime("%d/%m/%Y às %H:%M"),
+            "horario": format_brasilia_datetime(message.enviada_em),
         } for message in messages]
         other_data = {"id": other.id, "nome": other.nome, "foto": other.foto} if other else None
 

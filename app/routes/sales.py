@@ -10,6 +10,7 @@ from ..database import SessionLocal
 from ..models import ItemPedido, Pedido, Produto, Usuario
 from ..security import csrf_token
 from ..session import current_user
+from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
 
 
 router = APIRouter()
@@ -81,14 +82,15 @@ def customer_sales_page(request: Request, customer_id: int):
         if order.pago:
             paid_units += order.quantidade
         product_counts[order.produto_nome] += order.quantidade
-        weekday_counts[WEEKDAYS[order.criado_em.weekday()]] += 1
+        order_time = brasilia_datetime(order.criado_em)
+        weekday_counts[WEEKDAYS[order_time.weekday()]] += 1
         delivery_counts["Entrega"] += 1 if order.entregar_aqui else 0
         delivery_counts["Retirada"] += 0 if order.entregar_aqui else 1
         payment_counts["Pagar depois"] += 1 if order.pagar_depois else 0
         payment_counts["Pagamento imediato"] += 0 if order.pagar_depois else 1
         with SessionLocal() as database:
             items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
-        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": order.criado_em.strftime("%d/%m/%Y às %H:%M"), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago})
+        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": format_brasilia_datetime(order.criado_em), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago})
 
     def preference(counts: Counter, tie_text: str) -> str:
         top = counts.most_common()
