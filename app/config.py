@@ -25,6 +25,10 @@ class Settings:
         self.mercadopago_user_id = os.getenv("MERCADOPAGO_USER_ID", "")
         self.min_points_purchase = int(os.getenv("MIN_POINTS_PURCHASE", "1000"))
         self.max_points_purchase = int(os.getenv("MAX_POINTS_PURCHASE", "500000"))
+        self.mercadopago_client_id = os.getenv("MERCADOPAGO_CLIENT_ID", "")
+        self.mercadopago_client_secret = os.getenv("MERCADOPAGO_CLIENT_SECRET", "")
+        self.mercadopago_redirect_uri = os.getenv("MERCADOPAGO_REDIRECT_URI", "")
+        self.oauth_token_encryption_key = os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY", "")
 
 
 settings = Settings()

@@ -8,10 +8,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 
 from ..database import SessionLocal
-from ..models import PerfilComprador, PerfilVendedor, Produto, VisitaPerfilVendedor
+from ..models import IntegracaoMercadoPagoVendedor, PerfilComprador, PerfilVendedor, Produto, VisitaPerfilVendedor
+from ..services.mercadopago_oauth import oauth_configured
 from ..security import csrf_token, validate_csrf
 from ..services.profile_photo import FaceNotFoundError, ProfilePhotoError, process_profile_photo, process_seller_image
 from ..session import current_user
+from ..timezone_utils import format_brasilia_datetime
 
 
 router = APIRouter()
@@ -61,15 +63,22 @@ def edit_account(request: Request):
     if not usuario:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     seller_profile = None
+    mercadopago_integration = None
     if usuario.tipo_conta == "vendedor":
         with SessionLocal() as database:
             seller_profile = database.scalar(
                 select(PerfilVendedor).where(PerfilVendedor.usuario_id == usuario.id)
             )
+            integration = database.scalar(select(IntegracaoMercadoPagoVendedor).where(
+                IntegracaoMercadoPagoVendedor.vendedor_id == usuario.id,
+                IntegracaoMercadoPagoVendedor.ativo.is_(True),
+            ))
+            if integration:
+                mercadopago_integration = {"user_id": integration.mercadopago_user_id, "connected_at": format_brasilia_datetime(integration.conectado_em), "status": "Conectada"}
     return templates.TemplateResponse(
         request=request,
         name="editar_conta.html",
-        context={"usuario": usuario, "perfil_vendedor": seller_profile, "csrf_token": csrf_token(request)},
+        context={"usuario": usuario, "perfil_vendedor": seller_profile, "csrf_token": csrf_token(request), "mercadopago_integration": mercadopago_integration, "mercadopago_oauth_configured": oauth_configured()},
     )
 
 

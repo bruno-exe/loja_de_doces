@@ -231,3 +231,19 @@ class DepositoPontos(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IntegracaoMercadoPagoVendedor(Base):
+    __tablename__ = "integracoes_mercadopago_vendedores"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), unique=True, index=True)
+    mercadopago_user_id: Mapped[str] = mapped_column(String(80), index=True)
+    access_token_criptografado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refresh_token_criptografado: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    conectado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, index=True)

@@ -14,3 +14,4 @@ opencv-python-headless>=4.10,<5.0
 pytesseract>=0.3.13,<1.0
 python-dotenv>=1.1,<2.0
 tzdata>=2025.2
+cryptography>=46,<47

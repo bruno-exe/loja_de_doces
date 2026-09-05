@@ -673,6 +673,15 @@ h1 {
   .product-promotion-editor > div { grid-template-columns: auto 1fr; }
 }
 
+.mercadopago-integration-card > p { color: var(--chocolate-soft); }
+.mercadopago-integration-card .button:disabled { opacity: .55; cursor: not-allowed; }
+.mercadopago-safe-details { margin: 14px 0 18px; display: grid; gap: 8px; }
+.mercadopago-safe-details > div { padding: 10px 12px; display: flex; justify-content: space-between; gap: 16px; border-radius: 11px; background: var(--cream); }
+.mercadopago-safe-details dt,.mercadopago-safe-details dd { margin: 0; }
+.mercadopago-safe-details dt { color: var(--chocolate-soft); }
+.mercadopago-safe-details dd { font-weight: 800; overflow-wrap: anywhere; }
+.oauth-configuration-note { margin-top: 9px; display: block; color: var(--chocolate-soft); }
+
 .purchases-page { width: min(900px,calc(100% - 40px)); min-height: calc(100vh - 150px); margin: 0 auto; padding: 58px 0 90px; }
 .purchases-heading { margin-bottom: 28px; }
 .purchases-heading h1 { margin: 5px 0 10px; font-size: clamp(2.7rem,7vw,5rem); }

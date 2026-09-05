@@ -94,6 +94,21 @@
         <button class="button" type="submit">Salvar chave Pix</button>
       </form>
     </section>
+    <section id="mercado-pago" class="seller-presentation-editor mercadopago-integration-card">
+      <div><span class="eyebrow">Integração do vendedor</span><h2>Mercado Pago</h2></div>
+      {% set oauth_error = request.query_params.get('oauth_erro') %}
+      {% if oauth_error %}<div class="form-errors" role="alert">{% if oauth_error == 'configuracao' %}A conexão OAuth ainda não foi configurada pelo Come Doce.{% elif oauth_error == 'state' %}A solicitação expirou ou não pôde ser validada. Tente conectar novamente.{% elif oauth_error == 'cancelado' %}A autorização foi cancelada ou não retornou um código válido.{% else %}Não foi possível conectar a conta Mercado Pago. Tente novamente.{% endif %}</div>{% endif %}
+      {% if request.query_params.get('oauth_conectado') %}<div class="account-photo-success">Conta Mercado Pago conectada com sucesso.</div>{% endif %}
+      {% if request.query_params.get('oauth_desconectado') %}<div class="account-photo-success">Conta Mercado Pago desconectada.</div>{% endif %}
+      {% if mercadopago_integration %}
+        <p>Conta conectada.</p>
+        <dl class="mercadopago-safe-details"><div><dt>Identificador da conta</dt><dd>{{ mercadopago_integration.user_id }}</dd></div><div><dt>Conectada em</dt><dd>{{ mercadopago_integration.connected_at }}</dd></div><div><dt>Status</dt><dd>{{ mercadopago_integration.status }}</dd></div></dl>
+        <form method="post" action="/integracoes/mercadopago/desconectar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary" type="submit">Desconectar Mercado Pago</button></form>
+      {% else %}
+        <p>Sua conta Mercado Pago ainda não está conectada.</p>
+        {% if mercadopago_oauth_configured %}<a class="button" href="/integracoes/mercadopago/conectar">Conectar Mercado Pago</a>{% else %}<button class="button" type="button" disabled>Conectar Mercado Pago</button><small class="oauth-configuration-note">Configure as credenciais OAuth no servidor para habilitar esta opção.</small>{% endif %}
+      {% endif %}
+    </section>
     <script>
       const sellerPresentation = document.querySelector('#sellerPresentation');
       const presentationCount = document.querySelector('#presentationCount');

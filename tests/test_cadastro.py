@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 
 TEST_DATABASE = Path(tempfile.gettempdir()) / "comedoce_testes_cadastro.db"
@@ -18,7 +19,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Conversa, DepositoPontos, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -27,6 +28,9 @@ from app.routes.point_deposits import credit_confirmed_payment, parse_brl
 from app.services.mercadopago_points import PaymentResult
 from app.config import settings
 from app.timezone_utils import format_brasilia_datetime
+from app.routes import mercadopago_oauth as oauth_routes
+from app.services.mercadopago_oauth import OAuthTokens, decrypt_token, save_tokens
+from app.services.payment_distribution import calculate_payment_distribution
 from app.services.profile_photo import process_profile_photo, process_seller_image
 
 
@@ -1072,3 +1076,74 @@ def test_formats_database_times_in_brasilia_timezone() -> None:
     assert format_brasilia_datetime(utc_time) == "04/09/2026 às 12:30"
     # O SQLite devolve datas sem tzinfo; elas continuam sendo interpretadas como UTC.
     assert format_brasilia_datetime(utc_time.replace(tzinfo=None)) == "04/09/2026 às 12:30"
+
+
+def test_mercadopago_oauth_is_private_secure_and_seller_only(monkeypatch) -> None:
+    buyer = create_test_user("oauth-comprador@teste.com", "comprador")
+    seller = create_test_user("oauth-vendedor@teste.com", "vendedor")
+    other_seller = create_test_user("oauth-outro-vendedor@teste.com", "vendedor")
+
+    with TestClient(app) as buyer_client:
+        login = buyer_client.get("/login")
+        buyer_client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        assert "Mercado Pago" not in buyer_client.get("/conta/editar").text
+        assert buyer_client.get("/integracoes/mercadopago/conectar").status_code == 403
+
+    with TestClient(app) as seller_client:
+        login = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login), "email": seller.email, "senha": "senha-segura"})
+        unconfigured = seller_client.get("/conta/editar")
+        assert "Sua conta Mercado Pago ainda não está conectada." in unconfigured.text
+
+        monkeypatch.setattr(settings, "mercadopago_client_id", "client-id-test")
+        monkeypatch.setattr(settings, "mercadopago_client_secret", "client-secret-test")
+        monkeypatch.setattr(settings, "mercadopago_redirect_uri", "https://comedoce.com.br/integracoes/mercadopago/callback")
+        started = seller_client.get("/integracoes/mercadopago/conectar", follow_redirects=False)
+        assert started.status_code == 303
+        query = parse_qs(urlparse(started.headers["location"]).query)
+        assert query["state"][0]
+        assert query["client_id"] == ["client-id-test"]
+        state = query["state"][0]
+        invalid = seller_client.get(f"/integracoes/mercadopago/callback?code=abc&state=invalido", follow_redirects=False)
+        assert invalid.headers["location"].endswith("oauth_erro=state")
+
+        started = seller_client.get("/integracoes/mercadopago/conectar", follow_redirects=False)
+        state = parse_qs(urlparse(started.headers["location"]).query)["state"][0]
+        missing_code = seller_client.get(f"/integracoes/mercadopago/callback?state={state}", follow_redirects=False)
+        assert missing_code.headers["location"].endswith("oauth_erro=cancelado")
+
+        started = seller_client.get("/integracoes/mercadopago/conectar", follow_redirects=False)
+        state = parse_qs(urlparse(started.headers["location"]).query)["state"][0]
+        monkeypatch.setattr(oauth_routes, "exchange_code", lambda code, received_state: OAuthTokens(
+            "access-token-super-secreto", "refresh-token-super-secreto", "bearer",
+            "read write offline_access", "mp-seller-123", 15552000,
+        ))
+        connected = seller_client.get(f"/integracoes/mercadopago/callback?code=valid-code&state={state}", follow_redirects=False)
+        assert connected.status_code == 303
+        connected_page = seller_client.get("/conta/editar")
+        assert "Conta conectada." in connected_page.text
+        assert "mp-seller-123" in connected_page.text
+        assert "access-token-super-secreto" not in connected_page.text
+        assert "refresh-token-super-secreto" not in connected_page.text
+
+        with SessionLocal() as database:
+            integration = database.scalar(select(IntegracaoMercadoPagoVendedor).where(IntegracaoMercadoPagoVendedor.vendedor_id == seller.id))
+            assert integration.mercadopago_user_id == "mp-seller-123"
+            assert decrypt_token(integration.access_token_criptografado) == "access-token-super-secreto"
+            save_tokens(database, other_seller.id, OAuthTokens("other-access", "other-refresh", "bearer", "offline_access", "mp-other", 15552000))
+            database.commit()
+
+        disconnected = seller_client.post("/integracoes/mercadopago/desconectar", data={"csrf": csrf_from(connected_page)}, follow_redirects=False)
+        assert disconnected.status_code == 303
+        with SessionLocal() as database:
+            mine = database.scalar(select(IntegracaoMercadoPagoVendedor).where(IntegracaoMercadoPagoVendedor.vendedor_id == seller.id))
+            other = database.scalar(select(IntegracaoMercadoPagoVendedor).where(IntegracaoMercadoPagoVendedor.vendedor_id == other_seller.id))
+            assert mine.ativo is False and mine.access_token_criptografado is None
+            assert other.ativo is True and decrypt_token(other.access_token_criptografado) == "other-access"
+
+
+def test_future_payment_distribution_has_no_fixed_platform_fee() -> None:
+    distribution = calculate_payment_distribution(Decimal("20.00"), seller_id=123, product_id=456)
+    assert distribution.total_amount == Decimal("20.00")
+    assert distribution.seller_amount == Decimal("20.00")
+    assert distribution.platform_amount == Decimal("0.00")
