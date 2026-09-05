@@ -1147,3 +1147,50 @@ def test_future_payment_distribution_has_no_fixed_platform_fee() -> None:
     assert distribution.total_amount == Decimal("20.00")
     assert distribution.seller_amount == Decimal("20.00")
     assert distribution.platform_amount == Decimal("0.00")
+
+
+def test_purchases_are_shown_newest_first() -> None:
+    buyer = create_test_user("pilha-comprador@teste.com", "comprador")
+    old_seller = create_test_user("pilha-antigo@teste.com", "vendedor")
+    new_seller = create_test_user("pilha-novo@teste.com", "vendedor")
+    with SessionLocal() as database:
+        database.get(Usuario, old_seller.id).nome = "Loja compra antiga"
+        database.get(Usuario, new_seller.id).nome = "Loja compra recente"
+        old_product = Produto(vendedor_id=old_seller.id, nome="Doce antigo", descricao="Antigo", valor_centavos=100, aceita_fiado=True, com_entrega=False, imagem="antigo.webp")
+        new_product = Produto(vendedor_id=new_seller.id, nome="Doce recente", descricao="Recente", valor_centavos=200, aceita_fiado=True, com_entrega=False, imagem="recente.webp")
+        database.add_all([old_product, new_product])
+        database.flush()
+        database.add_all([
+            Pedido(cliente_id=buyer.id, vendedor_id=old_seller.id, produto_id=old_product.id, produto_nome=old_product.nome, valor_unitario_centavos=100, quantidade=1, valor_total_centavos=100, confirmado=True, criado_em=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+            Pedido(cliente_id=buyer.id, vendedor_id=new_seller.id, produto_id=new_product.id, produto_nome=new_product.nome, valor_unitario_centavos=200, quantidade=1, valor_total_centavos=200, confirmado=True, criado_em=datetime(2026, 9, 5, tzinfo=timezone.utc)),
+        ])
+        database.commit()
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        purchases = client.get("/minhas-compras")
+        assert purchases.text.index("Loja compra recente") < purchases.text.index("Loja compra antiga")
+
+
+def test_seller_customers_are_shown_by_most_recent_sale() -> None:
+    seller = create_test_user("pilha-vendas-vendedor@teste.com", "vendedor")
+    old_buyer = create_test_user("pilha-vendas-antigo@teste.com", "comprador")
+    new_buyer = create_test_user("pilha-vendas-novo@teste.com", "comprador")
+    with SessionLocal() as database:
+        database.get(Usuario, old_buyer.id).nome = "Cliente compra antiga"
+        database.get(Usuario, new_buyer.id).nome = "Cliente compra recente"
+        product = Produto(vendedor_id=seller.id, nome="Brigadeiro", descricao="Brigadeiro", valor_centavos=300, aceita_fiado=True, com_entrega=False, imagem="brigadeiro.webp")
+        database.add(product)
+        database.flush()
+        database.add_all([
+            Pedido(cliente_id=old_buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome=product.nome, valor_unitario_centavos=300, quantidade=1, valor_total_centavos=300, confirmado=True, criado_em=datetime(2026, 9, 1, tzinfo=timezone.utc)),
+            Pedido(cliente_id=new_buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome=product.nome, valor_unitario_centavos=300, quantidade=1, valor_total_centavos=300, confirmado=True, criado_em=datetime(2026, 9, 5, tzinfo=timezone.utc)),
+        ])
+        database.commit()
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": seller.email, "senha": "senha-segura"})
+        sales = client.get("/vendas")
+        assert sales.text.index("Cliente compra recente") < sales.text.index("Cliente compra antiga")

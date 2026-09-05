@@ -281,7 +281,7 @@ async def buy_product(
         if active_variations:
             submitted_form = await request.form()
             for variation in active_variations:
-                raw_quantity = str(submitted_form.get(f"variacao_{variation.id}", "0")).strip()
+                raw_quantity = str(submitted_form.get(f"variacao_{variation.id}", "0")).strip() or "0"
                 try:
                     variation_quantity = int(raw_quantity)
                 except ValueError:
@@ -366,7 +366,7 @@ async def add_product_to_cart(
             submitted_form = await request.form()
             for variation in active_variations:
                 try:
-                    selected_quantity = int(str(submitted_form.get(f"variacao_{variation.id}", "0")).strip())
+                    selected_quantity = int(str(submitted_form.get(f"variacao_{variation.id}", "0")).strip() or "0")
                 except ValueError:
                     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
                 if selected_quantity < 0 or selected_quantity > 99:

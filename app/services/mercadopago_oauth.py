@@ -78,8 +78,9 @@ def _cipher() -> Fernet:
     key = configured or base64.urlsafe_b64encode(hashlib.sha256(settings.secret_key.encode()).digest())
     try:
         return Fernet(key)
-    except (ValueError, TypeError) as exc:
-        raise MercadoPagoOAuthError("Chave de criptografia OAuth inválida.") from exc
+    except (ValueError, TypeError):
+        # Também aceita uma frase secreta comum e a converte em uma chave Fernet válida.
+        return Fernet(base64.urlsafe_b64encode(hashlib.sha256(key).digest()))
 
 
 def encrypt_token(value: str | None) -> str | None:

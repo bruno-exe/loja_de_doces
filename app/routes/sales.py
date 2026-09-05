@@ -38,7 +38,7 @@ def sales_page(request: Request):
             select(Pedido, Usuario)
             .join(Usuario, Usuario.id == Pedido.cliente_id)
             .where(Pedido.vendedor_id == seller.id, Pedido.confirmado.is_(True))
-            .order_by(Usuario.nome, Pedido.id)
+            .order_by(Pedido.criado_em.desc(), Pedido.id.desc())
         ).all()
 
     customers: dict[int, dict] = {}

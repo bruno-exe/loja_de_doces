@@ -22,16 +22,17 @@ def purchases_page(request: Request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
 
     with SessionLocal() as database:
+        latest_purchase = func.max(Pedido.criado_em).label("ultima_compra")
         rows = database.execute(
-            select(Usuario, func.sum(Pedido.quantidade))
+            select(Usuario, func.sum(Pedido.quantidade), latest_purchase)
             .join(Pedido, Pedido.vendedor_id == Usuario.id)
             .where(Pedido.cliente_id == usuario.id, Pedido.confirmado.is_(True))
             .group_by(Usuario.id)
-            .order_by(Usuario.nome, Usuario.id)
+            .order_by(latest_purchase.desc(), Usuario.id.desc())
         ).all()
         sellers = [
             {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "quantidade": int(quantity or 0)}
-            for seller, quantity in rows
+            for seller, quantity, _ in rows
         ]
 
     return templates.TemplateResponse(request=request, name="minhas_compras.html", context={"usuario": usuario, "csrf_token": csrf_token(request), "vendedores": sellers})
@@ -48,7 +49,7 @@ def seller_purchases_page(request: Request, seller_id: int):
         rows = database.execute(
             select(Pedido, Produto).outerjoin(Produto, Produto.id == Pedido.produto_id)
             .where(Pedido.cliente_id == usuario.id, Pedido.vendedor_id == seller_id, Pedido.confirmado.is_(True))
-            .order_by(Pedido.id.desc())
+            .order_by(Pedido.criado_em.desc(), Pedido.id.desc())
         ).all()
         if seller is None or not rows:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compras não encontradas.")

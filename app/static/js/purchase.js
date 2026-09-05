@@ -76,7 +76,16 @@
         const template = document.querySelector(`#purchaseVariations${button.dataset.productId}`);
         if (template) variationOptions.appendChild(template.content.cloneNode(true));
       }
-      variationOptions.querySelectorAll('input[type="number"]').forEach((input) => input.addEventListener("input", updatePromotion));
+      variationOptions.querySelectorAll('input[type="number"]').forEach((input) => {
+        input.addEventListener("focus", () => {
+          if (input.value === "0") input.value = "";
+        });
+        input.addEventListener("blur", () => {
+          if (input.value === "") input.value = "0";
+          updatePromotion();
+        });
+        input.addEventListener("input", updatePromotion);
+      });
       updatePromotion();
       dialog.showModal();
     });
