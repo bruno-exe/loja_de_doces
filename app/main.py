@@ -23,6 +23,7 @@ from .routes.messages import router as messages_router
 from .routes.points import router as points_router
 from .routes.point_deposits import router as point_deposits_router
 from .routes.mercadopago_oauth import router as mercadopago_oauth_router
+from .routes.order_mercadopago import router as order_mercadopago_router
 from .security import csrf_token
 from .session import current_user
 
@@ -126,6 +127,7 @@ app.include_router(messages_router)
 app.include_router(points_router)
 app.include_router(point_deposits_router)
 app.include_router(mercadopago_oauth_router)
+app.include_router(order_mercadopago_router)
 
 
 @app.get("/", response_class=HTMLResponse)

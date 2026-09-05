@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} · Come Doce{% endblock %}
+{% block content %}<section class="points-return-page"><article><span class="eyebrow">Mercado Pago</span><h1>{{ titulo }}</h1><p>{{ mensagem }}</p>{% if pedido_id %}<a class="button" href="/pagamentos/pedidos/{{ pedido_id }}">Voltar ao pedido</a>{% else %}<a class="button" href="/minhas-compras">Minhas compras</a>{% endif %}</article></section>{% endblock %}

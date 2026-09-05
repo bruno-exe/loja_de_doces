@@ -727,6 +727,11 @@ h1 {
 .payment-order-total small { color: #347044; font-weight: 800; }
 .payment-order-total strong { color: #a94f0c; font-size: 1.25rem; }
 .pix-payment-card { margin-top: 20px; padding: clamp(22px,5vw,34px); border: 1px solid var(--line); border-radius: 24px; background: white; box-shadow: var(--shadow); }
+.mercadopago-checkout-card { margin-top: 20px; padding: clamp(22px,5vw,34px); border: 1px solid #b7d5ef; border-radius: 24px; background: #f7fbff; box-shadow: var(--shadow); }
+.mercadopago-checkout-card h2 { margin: 4px 0 10px; font-family: Georgia,serif; font-size: 1.7rem; }
+.mercadopago-checkout-card p { color: var(--chocolate-soft); line-height: 1.5; }
+.mercadopago-checkout-card form { margin-top: 15px; }
+.mercadopago-checkout-card > small { margin-top: 12px; display: block; color: var(--chocolate-soft); font-weight: 700; }
 .pix-payment-card h2 { margin: 4px 0 14px; font-family: Georgia,serif; font-size: 1.7rem; }
 .pix-key-value { padding: 15px; color: #713713; border: 1px dashed #d99c6a; border-radius: 13px; background: #fff4e9; font-weight: 850; overflow-wrap: anywhere; user-select: all; }
 .pix-payment-card p { margin: 12px 0 0; color: var(--chocolate-soft); font-size: .86rem; }

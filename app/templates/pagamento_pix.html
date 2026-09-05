@@ -14,6 +14,17 @@
     <div class="payment-order-total">{% if pedido.desconto %}<small>Desconto: - {{ pedido.desconto }}</small>{% endif %}<strong>{{ pedido.valor_total }}</strong></div>
   </article>
 
+  <section class="mercadopago-checkout-card">
+    <span class="eyebrow">Pagamento online</span><h2>Mercado Pago</h2>
+    {% set mp_error = request.query_params.get('erro_mp') %}
+    {% if mp_error %}<div class="form-errors" role="alert">{% if mp_error == 'sem_conta' %}Este vendedor ainda não configurou o recebimento pelo Mercado Pago.{% elif mp_error == 'indisponivel' %}Este pedido não está disponível para pagamento.{% elif mp_error == 'comprovante' %}Este pedido já possui um comprovante anexado.{% elif mp_error == 'endereco' %}O endereço público de pagamentos ainda não foi configurado.{% else %}Não foi possível abrir o Mercado Pago agora. Tente novamente.{% endif %}</div>{% endif %}
+    {% if pedido.pago %}<div class="receipt-saved"><strong>Pagamento aprovado</strong><span>Este pedido já está pago.</span></div>
+    {% elif pedido.comprovante %}<p>O comprovante deste pedido já foi enviado e está aguardando a conferência.</p>
+    {% elif mercadopago.available %}<p>Pague no ambiente seguro do Mercado Pago. O valor é calculado pelo Come Doce com os dados do pedido.</p><form method="post" action="/pagamentos/pedidos/{{ pedido.id }}/mercadopago"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button" type="submit">Pagar com Mercado Pago</button></form>
+    {% else %}<p>Este vendedor ainda não configurou o recebimento pelo Mercado Pago.</p>{% endif %}
+    {% if mercadopago.status and not pedido.pago %}<small>Status: {{ {'aguardando_pagamento':'Aguardando pagamento','pagamento_recusado':'Pagamento recusado','pagamento_cancelado':'Pagamento cancelado','reembolsado':'Pagamento reembolsado','erro':'Pagamento indisponível'}.get(mercadopago.status, mercadopago.status) }}</small>{% endif %}
+  </section>
+
   <section class="pix-payment-card">
     <span class="eyebrow">Pague com Pix</span><h2>Chave Pix do vendedor</h2>
     {% if vendedor.chave_pix %}<div class="pix-key-value">{{ vendedor.chave_pix }}</div><p>Faça o pagamento no aplicativo do seu banco. A confirmação automática será adicionada futuramente.</p>{% else %}<div class="form-errors" role="alert">Este vendedor ainda não cadastrou uma chave Pix. Combine o pagamento diretamente com ele.</div>{% endif %}

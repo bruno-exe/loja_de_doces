@@ -247,3 +247,25 @@ class IntegracaoMercadoPagoVendedor(Base):
     conectado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class PagamentoPedidoMercadoPago(Base):
+    __tablename__ = "pagamentos_pedidos_mercadopago"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pedido_id: Mapped[int] = mapped_column(ForeignKey("pedidos.id"), unique=True, index=True)
+    comprador_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    valor_esperado_centavos: Mapped[int] = mapped_column(Integer)
+    provider_preference_id: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True)
+    provider_payment_id: Mapped[str | None] = mapped_column(String(160), unique=True, nullable=True)
+    external_reference: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    webhook_reference: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(80), unique=True)
+    checkout_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_status: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    provider_status_detail: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status_pagamento: Mapped[str] = mapped_column(String(30), default="aguardando_pagamento", index=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

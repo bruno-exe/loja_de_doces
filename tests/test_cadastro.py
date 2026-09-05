@@ -1,4 +1,6 @@
 import re
+import hashlib
+import hmac
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -19,7 +21,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, PagamentoPedidoMercadoPago, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -31,6 +33,8 @@ from app.timezone_utils import format_brasilia_datetime
 from app.routes import mercadopago_oauth as oauth_routes
 from app.services.mercadopago_oauth import OAuthTokens, decrypt_token, save_tokens
 from app.services.payment_distribution import calculate_payment_distribution
+from app.routes import order_mercadopago as order_mp_routes
+from app.services.mercadopago_order_payment import OrderCheckoutResult
 from app.services.profile_photo import process_profile_photo, process_seller_image
 
 
@@ -1194,3 +1198,69 @@ def test_seller_customers_are_shown_by_most_recent_sale() -> None:
         client.post("/login", data={"csrf": csrf_from(login), "email": seller.email, "senha": "senha-segura"})
         sales = client.get("/vendas")
         assert sales.text.index("Cliente compra recente") < sales.text.index("Cliente compra antiga")
+
+
+def test_order_checkout_uses_own_seller_token_and_database_total(monkeypatch) -> None:
+    seller = create_test_user("checkout-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("checkout-comprador@teste.com", "comprador")
+    outsider = create_test_user("checkout-outro@teste.com", "comprador")
+    no_mp_seller = create_test_user("checkout-sem-mp@teste.com", "vendedor")
+    with SessionLocal() as database:
+        product = Produto(vendedor_id=seller.id, nome="Caixa de bombons", descricao="Sabores variados", valor_centavos=750, aceita_fiado=True, com_entrega=True, imagem="caixa.webp")
+        other_product = Produto(vendedor_id=no_mp_seller.id, nome="Bolo", descricao="Bolo", valor_centavos=500, aceita_fiado=True, com_entrega=False, imagem="bolo.webp")
+        database.add_all([product, other_product])
+        database.flush()
+        order = Pedido(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome=product.nome, produto_descricao=product.descricao, valor_unitario_centavos=750, quantidade=2, valor_total_centavos=1500, confirmado=False)
+        no_mp_order = Pedido(cliente_id=buyer.id, vendedor_id=no_mp_seller.id, produto_id=other_product.id, produto_nome=other_product.nome, valor_unitario_centavos=500, quantidade=1, valor_total_centavos=500, confirmado=False)
+        database.add_all([order, no_mp_order])
+        database.flush()
+        database.add(ItemCarrinho(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, pedido_pendente_id=order.id, quantidade=2))
+        save_tokens(database, seller.id, OAuthTokens("seller-oauth-token", "seller-refresh", "bearer", "read write offline_access", "collector-seller", 15552000))
+        database.commit()
+        order_id, no_mp_order_id = order.id, no_mp_order.id
+
+    monkeypatch.setattr(settings, "public_base_url", "https://comedoce.com.br")
+    monkeypatch.setattr(settings, "mercadopago_mode", "production")
+    captured = {}
+    def fake_checkout(token, payment, order, base_url, mode):
+        captured.update(token=token, cents=payment.valor_esperado_centavos, order_id=order.id)
+        return OrderCheckoutResult("preference-order-test", "https://mercadopago.example/checkout")
+    monkeypatch.setattr(order_mp_routes.provider, "create_checkout", fake_checkout)
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        page = client.get(f"/pagamentos/pedidos/{order_id}")
+        assert "Pagar com Mercado Pago" in page.text
+        assert "Este vendedor ainda não configurou" in client.get(f"/pagamentos/pedidos/{no_mp_order_id}").text
+        response = client.post(f"/pagamentos/pedidos/{order_id}/mercadopago", data={"csrf": csrf_from(page), "valor": "0,01"}, follow_redirects=False)
+        assert response.headers["location"] == "https://mercadopago.example/checkout"
+        assert captured == {"token": "seller-oauth-token", "cents": 1500, "order_id": order_id}
+        with SessionLocal() as database:
+            record = database.scalar(select(PagamentoPedidoMercadoPago).where(PagamentoPedidoMercadoPago.pedido_id == order_id))
+            assert record.provider_preference_id == "preference-order-test"
+            external_reference, webhook_reference = record.external_reference, record.webhook_reference
+        assert "Pagamento em análise" in client.get("/pagamentos/mercadopago/sucesso").text
+        with SessionLocal() as database:
+            assert database.get(Pedido, order_id).pago is False
+
+        webhook_url = f"/api/webhooks/mercadopago/compras?ref={webhook_reference}"
+        assert client.post(webhook_url, json={"type": "payment", "data": {"id": "payment-order-test"}}).status_code == 401
+        approved = PaymentResult("payment-order-test", external_reference, "approved", "accredited", Decimal("15.00"), "BRL", "collector-seller", True)
+        monkeypatch.setattr(order_mp_routes, "get_seller_mercadopago_credentials", lambda database, seller_id: "seller-oauth-token")
+        monkeypatch.setattr(order_mp_routes.provider, "get_payment", lambda token, payment_id: approved)
+        request_id, timestamp = "request-order-test", "1234567890"
+        manifest = f"id:payment-order-test;request-id:{request_id};ts:{timestamp};"
+        signature = hmac.new(settings.mercadopago_webhook_secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+        headers = {"x-request-id": request_id, "x-signature": f"ts={timestamp},v1={signature}"}
+        assert client.post(webhook_url, json={"type": "payment", "data": {"id": "payment-order-test"}}, headers=headers).status_code == 200
+        assert client.post(webhook_url, json={"type": "payment", "data": {"id": "payment-order-test"}}, headers=headers).status_code == 200
+        with SessionLocal() as database:
+            assert database.get(Pedido, order_id).pago is True
+            assert database.get(Pedido, order_id).confirmado is True
+            assert database.scalar(select(ItemCarrinho).where(ItemCarrinho.pedido_pendente_id == order_id)) is None
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": outsider.email, "senha": "senha-segura"})
+        assert client.get(f"/pagamentos/pedidos/{order_id}").status_code == 404

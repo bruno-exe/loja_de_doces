@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal
-from ..models import ComprovantePagamento, ItemCarrinho, ItemPedido, LancamentoPontos, Pedido, PerfilVendedor, Produto, Usuario
+from ..models import ComprovantePagamento, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, PagamentoPedidoMercadoPago, Pedido, PerfilVendedor, Produto, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..timezone_utils import format_brasilia_datetime
@@ -67,6 +67,11 @@ def payment_page(request: Request, order_id: int):
             .where(Pedido.id == order_id, Pedido.cliente_id == user.id)
         ).first()
         receipt = database.scalar(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == order_id))
+        seller_mp = database.scalar(select(IntegracaoMercadoPagoVendedor.id).where(
+            IntegracaoMercadoPagoVendedor.vendedor_id == row[0].vendedor_id,
+            IntegracaoMercadoPagoVendedor.ativo.is_(True),
+        )) if row else None
+        mp_payment = database.scalar(select(PagamentoPedidoMercadoPago).where(PagamentoPedidoMercadoPago.pedido_id == order_id))
         order_items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order_id).order_by(ItemPedido.id)).all()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado.")
@@ -90,7 +95,8 @@ def payment_page(request: Request, order_id: int):
         "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro} if receipt else None,
     }
     seller_data = {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "chave_pix": seller_profile.chave_pix}
-    return templates.TemplateResponse(request=request, name="pagamento_pix.html", context={"usuario": user, "csrf_token": csrf_token(request), "vendedor": seller_data, "pedido": payment})
+    mp_data = {"available": bool(seller_mp), "status": mp_payment.status_pagamento if mp_payment else None}
+    return templates.TemplateResponse(request=request, name="pagamento_pix.html", context={"usuario": user, "csrf_token": csrf_token(request), "vendedor": seller_data, "pedido": payment, "mercadopago": mp_data})
 
 
 @router.post("/pagamentos/pedidos/{order_id}/comprovante")
