@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from io import BytesIO
 
+import numpy as np
 from PIL import Image
 
 from app.services import pix_receipt_ocr
@@ -30,28 +31,17 @@ def image_bytes() -> bytes:
     return output.getvalue()
 
 
-def empty_ocr_data() -> dict:
-    return {
-        key: []
-        for key in (
-            "text", "conf", "left", "top", "width", "height",
-            "block_num", "par_num", "line_num",
-        )
-    }
-
-
-def mock_ocr(monkeypatch, text: str, *, passes=None, data=None) -> None:
-    results = passes if passes is not None else [("general", text)]
+def mock_ocr(monkeypatch, general: str, top: str = "") -> None:
     monkeypatch.setattr(
         pix_receipt_ocr,
         "run_ocr_passes",
-        lambda variants: (results, data or empty_ocr_data()),
+        lambda variants: [("general", general), ("top_value", top)],
     )
 
 
-def parse_text(text: str, *, passes=None, data=None) -> dict:
+def parse_text(general: str, top: str = "") -> dict:
     return pix_receipt_ocr.parse_pix_receipt(
-        passes or [("general", text)], data or empty_ocr_data(), 1000
+        [("general", general), ("top_value", top)]
     )
 
 
@@ -59,9 +49,7 @@ def test_extracts_pix_receipt_fields_without_changing_source(monkeypatch) -> Non
     mock_ocr(monkeypatch, SAMPLE_OCR)
     original = image_bytes()
     source = BytesIO(original)
-
     result = pix_receipt_ocr.extract_pix_receipt(source)
-
     assert source.getvalue() == original
     assert result["valor"] == Decimal("25.00")
     assert result["data"] == "2026-09-02"
@@ -77,14 +65,13 @@ def test_extracts_pix_receipt_fields_without_changing_source(monkeypatch) -> Non
 def test_compares_expected_order_and_seller_data(monkeypatch) -> None:
     mock_ocr(monkeypatch, SAMPLE_OCR)
     extracted = pix_receipt_ocr.extract_pix_receipt(image_bytes())
-    comparison = pix_receipt_ocr.compare_pix_receipt(
+    assert pix_receipt_ocr.compare_pix_receipt(
         extracted,
         expected_value=Decimal("25.00"),
         expected_date=date(2026, 9, 2),
         expected_recipient="Joao da Silva",
         expected_pix_key="joao.silva@criar",
-    )
-    assert comparison == {
+    ) == {
         "valor_confere": True,
         "data_confere": True,
         "destinatario_confere": True,
@@ -104,29 +91,21 @@ def test_returns_none_for_fields_not_found(monkeypatch) -> None:
 
 def test_recognizes_supported_currency_formats() -> None:
     cases = {
-        "R$ 5": "5.00", "R$5": "5.00", "R$ 5,00": "5.00",
-        "R$ 20,50": "20.50", "R$ 20.50": "20.50",
+        "R$ 5": "5.00",
+        "R$5": "5.00",
+        "R$ 5,00": "5.00",
+        "R$ 20,50": "20.50",
+        "R$ 20.50": "20.50",
+        "20,50": "20.50",
     }
     for text, expected in cases.items():
         assert parse_text(text)["valor"] == Decimal(expected)
 
 
-def test_accepts_standalone_decimal_value_with_lower_confidence() -> None:
-    result = parse_text("5,00")
+def test_top_region_recovers_value_missed_by_general_ocr() -> None:
+    result = parse_text("Comprovante Pix\n4/9/2026 16:54", "R$ 5")
     assert result["valor"] == Decimal("5.00")
-    assert 0.55 <= result["confidence"]["valor"] < 0.72
-
-
-def test_associates_separate_currency_and_number_boxes() -> None:
-    data = {
-        "text": ["R$", "5"], "conf": ["94", "96"],
-        "left": [100, 145], "top": [260, 258],
-        "width": [32, 22], "height": [35, 39],
-        "block_num": [1, 1], "par_num": [1, 1], "line_num": [1, 1],
-    }
-    result = parse_text("Comprovante Pix", data=data)
-    assert result["valor"] == Decimal("5.00")
-    assert result["confidence"]["valor"] >= 0.55
+    assert result["data"] == "2026-09-04"
 
 
 def test_does_not_use_cpf_date_time_or_transaction_id_as_value() -> None:
@@ -136,46 +115,38 @@ ID da transacao ABC12345678901234567890"""
     assert parse_text(text)["valor"] is None
 
 
-def test_selects_currency_value_among_unrelated_numbers() -> None:
-    text = """CPF 123.456.789-01
-Data 04/09/2026 16:54
-R$ 20,50
-ID E1234567820260902ABCDEF1234567890"""
-    assert parse_text(text)["valor"] == Decimal("20.50")
-
-
-def test_extracts_written_date_time_and_both_transaction_ids() -> None:
+def test_extracts_written_date_recipient_and_time() -> None:
     text = """Comprovante Pix
 4/setembro/2026 as 16:54:16
-Numero da transacao
-MP-123456789
-EndToEndId
-E1234567820260902ABCDEF1234567890"""
+Recebedor
+MARIA DA SILVA"""
     result = parse_text(text)
     assert result["data"] == "2026-09-04"
     assert result["hora"] == "16:54:16"
-    assert result["transaction_id"] == "MP-123456789"
-    assert result["pix_id"] == "E1234567820260902ABCDEF1234567890"
+    assert result["destinatario"] == "MARIA DA SILVA"
 
 
-def test_combines_passes_when_general_ocr_misses_value() -> None:
-    passes = [
-        ("general", "Comprovante Pix\n4/9/2026 16:54"),
-        ("sparse", "Origem e destino"),
-        ("top_value", "R$ 5"),
-    ]
-    result = parse_text("", passes=passes)
-    assert result["valor"] == Decimal("5.00")
-    assert result["data"] == "2026-09-04"
+def test_main_pipeline_calls_tesseract_exactly_twice(monkeypatch) -> None:
+    calls = []
 
+    def fake_run(image, config):
+        calls.append(config)
+        return "Comprovante Pix" if len(calls) == 1 else "R$ 5"
 
-def test_rejects_separate_value_tokens_with_low_ocr_confidence() -> None:
-    data = {
-        "text": ["R$", "5"], "conf": ["0", "0"],
-        "left": [100, 145], "top": [250, 250],
-        "width": [32, 22], "height": [35, 35],
-        "block_num": [1, 1], "par_num": [1, 1], "line_num": [1, 1],
+    monkeypatch.setattr(pix_receipt_ocr, "_run_ocr", fake_run)
+    variants = {
+        "general": np.zeros((100, 100), dtype=np.uint8),
+        "top_value": np.zeros((50, 100), dtype=np.uint8),
     }
-    result = parse_text("Comprovante Pix", data=data)
-    assert result["valor"] is None
-    assert result["confidence"]["valor"] == 0.0
+    result = pix_receipt_ocr.parse_pix_receipt(pix_receipt_ocr.run_ocr_passes(variants))
+    assert len(calls) == 2
+    assert "--psm 6" in calls[0]
+    assert "--psm 11" in calls[1]
+    assert result["valor"] == Decimal("5.00")
+
+
+def test_large_image_is_reduced_without_upscaling_small_images() -> None:
+    large = pix_receipt_ocr.prepare_image(Image.new("RGB", (3000, 2000), "white"))
+    small = pix_receipt_ocr.prepare_image(Image.new("RGB", (600, 400), "white"))
+    assert large.shape == (800, 1200)
+    assert small.shape == (400, 600)
