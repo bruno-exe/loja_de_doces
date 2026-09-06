@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from PIL import Image, UnidentifiedImageError
 
@@ -26,12 +26,22 @@ RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
 MAX_RECEIPT_SIZE = 10 * 1024 * 1024
 
 
-def process_receipt_ocr(receipt_id: int) -> None:
+def process_receipt_ocr(receipt_id: int, *, force: bool = False) -> None:
     with SessionLocal() as database:
         receipt = database.get(ComprovantePagamento, receipt_id)
-        if receipt is None or receipt.ocr_processado_em is not None:
+        if receipt is None or (receipt.ocr_processado_em is not None and not force):
             return
         path = RECEIPT_DIR / Path(receipt.arquivo).name
+        receipt.ocr_valor = None
+        receipt.ocr_data = None
+        receipt.ocr_hora = None
+        receipt.ocr_destinatario = None
+        receipt.ocr_cpf_cnpj_destinatario = None
+        receipt.ocr_pagador = None
+        receipt.ocr_instituicao = None
+        receipt.ocr_e2e_id = None
+        receipt.texto_ocr = None
+        receipt.ocr_erro = None
         try:
             data = extract_pix_receipt(path)
             receipt.ocr_valor = str(data["valor"]) if data["valor"] is not None else None
@@ -64,7 +74,10 @@ def payment_page(request: Request, order_id: int):
             .join(Usuario, Usuario.id == Pedido.vendedor_id)
             .join(PerfilVendedor, PerfilVendedor.usuario_id == Usuario.id)
             .outerjoin(Produto, Produto.id == Pedido.produto_id)
-            .where(Pedido.id == order_id, Pedido.cliente_id == user.id)
+            .where(
+                Pedido.id == order_id,
+                or_(Pedido.cliente_id == user.id, Pedido.vendedor_id == user.id),
+            )
         ).first()
         receipt = database.scalar(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == order_id))
         seller_mp = database.scalar(select(IntegracaoMercadoPagoVendedor.id).where(
@@ -81,6 +94,9 @@ def payment_page(request: Request, order_id: int):
         with SessionLocal() as database:
             receipt = database.get(ComprovantePagamento, receipt.id)
     order, seller, seller_profile, product = row
+    is_seller_view = user.id == order.vendedor_id
+    with SessionLocal() as database:
+        buyer = database.get(Usuario, order.cliente_id)
     payment = {
         "id": order.id,
         "nome": order.produto_nome,
@@ -95,8 +111,9 @@ def payment_page(request: Request, order_id: int):
         "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro} if receipt else None,
     }
     seller_data = {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "chave_pix": seller_profile.chave_pix}
+    buyer_data = {"id": buyer.id, "nome": buyer.nome, "foto": buyer.foto} if buyer else None
     mp_data = {"available": bool(seller_mp), "status": mp_payment.status_pagamento if mp_payment else None}
-    return templates.TemplateResponse(request=request, name="pagamento_pix.html", context={"usuario": user, "csrf_token": csrf_token(request), "vendedor": seller_data, "pedido": payment, "mercadopago": mp_data})
+    return templates.TemplateResponse(request=request, name="pagamento_pix.html", context={"usuario": user, "csrf_token": csrf_token(request), "vendedor": seller_data, "cliente": buyer_data, "pedido": payment, "mercadopago": mp_data, "visualizacao_vendedor": is_seller_view})
 
 
 @router.post("/pagamentos/pedidos/{order_id}/comprovante")
@@ -158,6 +175,32 @@ async def upload_payment_receipt(request: Request, order_id: int, comprovante: U
         raise
     process_receipt_ocr(receipt_id)
     return RedirectResponse(f"/pagamentos/pedidos/{order_id}?comprovante=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/pagamentos/comprovantes/{receipt_id}/reanalisar")
+def reprocess_payment_receipt(request: Request, receipt_id: int, csrf: str = Form(...)):
+    validate_csrf(request, csrf)
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    with SessionLocal() as database:
+        row = database.execute(
+            select(ComprovantePagamento, Pedido)
+            .join(Pedido, Pedido.id == ComprovantePagamento.pedido_id)
+            .where(ComprovantePagamento.id == receipt_id)
+        ).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante não encontrado.")
+    receipt, order = row
+    if user.id not in {order.cliente_id, order.vendedor_id}:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante não encontrado.")
+
+    process_receipt_ocr(receipt.id, force=True)
+    return RedirectResponse(
+        f"/pagamentos/pedidos/{order.id}?reanalisado=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("/pagamentos/comprovantes/{receipt_id}/imagem")

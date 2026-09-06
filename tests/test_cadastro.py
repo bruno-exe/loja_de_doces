@@ -945,6 +945,7 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         assert "Texto extraído do comprovante" in receipt_page.text
         assert "Valor: R$ 19,00" in receipt_page.text
         assert "Destinatário: VENDEDOR REAL DA SILVA" in receipt_page.text
+        assert "Analisar novamente" in receipt_page.text
 
         with SessionLocal() as database:
             receipt = database.scalar(select(ComprovantePagamento).where(ComprovantePagamento.cliente_id == buyer.id))
@@ -954,6 +955,17 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
             assert receipt.ocr_processado_em is not None
             saved_receipt = tmp_path / receipt.arquivo
             assert saved_receipt.exists()
+
+        reanalyzed = buyer_client.post(
+            f"/pagamentos/comprovantes/{receipt.id}/reanalisar",
+            data={"csrf": csrf_from(receipt_page)},
+            follow_redirects=False,
+        )
+        assert reanalyzed.status_code == 303
+        assert reanalyzed.headers["location"] == f"{purchase.headers['location']}?reanalisado=1"
+        reanalyzed_page = buyer_client.get(reanalyzed.headers["location"])
+        assert "Comprovante analisado novamente." in reanalyzed_page.text
+        assert "Valor: R$ 19,00" in reanalyzed_page.text
         assert buyer_client.get(f"/pagamentos/comprovantes/{receipt.id}/imagem").status_code == 200
 
         repeated = buyer_client.post(
@@ -978,7 +990,21 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
 
         purchases = buyer_client.get(f"/minhas-compras/vendedores/{seller.id}")
         assert "Pagamento pendente" in purchases.text
-        assert f'href="{purchase.headers["location"]}">Pagar</a>' in purchases.text
+        assert f'href="{purchase.headers["location"]}">Ver comprovante</a>' in purchases.text
+
+    with TestClient(app) as seller_client:
+        login_page = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login_page), "email": seller.email, "senha": "senha-segura"})
+        customer_sales = seller_client.get(f"/vendas/clientes/{buyer.id}")
+        assert f'href="{purchase.headers["location"]}">Ver comprovante</a>' in customer_sales.text
+        seller_receipt_page = seller_client.get(purchase.headers["location"])
+        assert seller_receipt_page.status_code == 200
+        assert "Comprovante recebido de" in seller_receipt_page.text
+        assert "Valor: R$ 19,00" in seller_receipt_page.text
+        assert "Analisar novamente" in seller_receipt_page.text
+        assert "Anexar comprovante" not in seller_receipt_page.text
+        assert "Pagar com Mercado Pago" not in seller_receipt_page.text
+        assert seller_client.get(f"/pagamentos/comprovantes/{receipt.id}/imagem").status_code == 200
 
     with TestClient(app) as other_client:
         other = create_test_user("pix-outro@teste.com", "comprador")

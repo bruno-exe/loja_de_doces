@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from ..database import SessionLocal
-from ..models import ItemPedido, Pedido, Produto, Usuario
+from ..models import ComprovantePagamento, ItemPedido, Pedido, Produto, Usuario
 from ..security import csrf_token
 from ..session import current_user
 from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
@@ -90,7 +90,8 @@ def customer_sales_page(request: Request, customer_id: int):
         payment_counts["Pagamento imediato"] += 0 if order.pagar_depois else 1
         with SessionLocal() as database:
             items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
-        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": format_brasilia_datetime(order.criado_em), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago})
+            receipt_id = database.scalar(select(ComprovantePagamento.id).where(ComprovantePagamento.pedido_id == order.id))
+        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": format_brasilia_datetime(order.criado_em), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago, "comprovante_id": receipt_id})
 
     def preference(counts: Counter, tie_text: str) -> str:
         top = counts.most_common()
