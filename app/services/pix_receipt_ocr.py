@@ -128,6 +128,28 @@ def _extract_text_field(lines: list[str], labels: tuple[str, ...]) -> str | None
     return None
 
 
+def _extract_origin_destination(lines: list[str]) -> tuple[str | None, str | None]:
+    """Extrai os dois nomes do bloco comum 'Origem e destino'."""
+    start = next((index for index, line in enumerate(lines) if "origem" in _fold(line) and "destino" in _fold(line)), None)
+    if start is None:
+        return None, None
+    institutions = ("mercado pago", "nubank", "itau", "santander", "bradesco", "banco do brasil", "caixa", "inter", "picpay")
+    names = []
+    for line in lines[start + 1:start + 12]:
+        folded = _fold(line)
+        if any(label in folded for label in TRANSACTION_LABELS + E2E_LABELS):
+            break
+        if "cpf" in folded or "cnpj" in folded or any(name == folded for name in institutions):
+            continue
+        if any(char.isdigit() for char in line):
+            continue
+        if len(re.findall(r"[A-Za-zÀ-ÿ]{2,}", line)) >= 2:
+            names.append(line.strip())
+        if len(names) == 2:
+            return names[0], names[1]
+    return (names[0] if names else None), None
+
+
 def _extract_recipient_document(lines: list[str], text: str) -> str | None:
     for candidate in _near_labels(lines, RECIPIENT_LABELS, 5) + [text]:
         match = DOCUMENT_RE.search(candidate)
@@ -167,7 +189,9 @@ def parse_pix_receipt(text: str, ocr_lines: list[OCRLine] | None = None) -> dict
     lines = _lines(text)
     value, value_confidence = _extract_value(ocr_lines, text)
     extracted_date, extracted_time = _extract_datetime(text)
-    recipient = _extract_text_field(lines, RECIPIENT_LABELS)
+    block_payer, block_recipient = _extract_origin_destination(lines)
+    recipient = block_recipient or _extract_text_field(lines, RECIPIENT_LABELS)
+    payer = block_payer or _extract_text_field(lines, PAYER_LABELS)
     e2e_id = _extract_e2e(lines, text)
     return {
         "valor": value,
@@ -175,7 +199,7 @@ def parse_pix_receipt(text: str, ocr_lines: list[OCRLine] | None = None) -> dict
         "hora": extracted_time,
         "destinatario": recipient,
         "cpf_cnpj_destinatario": _extract_recipient_document(lines, text),
-        "pagador": _extract_text_field(lines, PAYER_LABELS),
+        "pagador": payer,
         "instituicao": _extract_institution(lines),
         "e2e_id": e2e_id,
         "transaction_id": _extract_transaction_id(lines),

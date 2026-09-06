@@ -47,6 +47,11 @@
         <h3>Texto extraído do comprovante</h3>
         {% if request.query_params.get('reanalisado') %}<div class="account-photo-success" role="status">Comprovante analisado novamente.</div>{% endif %}
         {% if pedido.comprovante.texto_ocr %}<pre>{{ pedido.comprovante.texto_ocr }}</pre>{% else %}<div class="form-errors" role="alert">{{ pedido.comprovante.ocr_erro or 'Nenhum texto foi reconhecido na imagem.' }}</div>{% endif %}
+        <div class="receipt-extracted-summary">
+          <div><span>Valor</span><strong>{{ pedido.comprovante.valor or 'Não identificado' }}</strong></div>
+          <div><span>Pagador</span><strong>{{ pedido.comprovante.pagador or 'Não identificado' }}</strong></div>
+          <div><span>Quem recebeu</span><strong>{{ pedido.comprovante.destinatario or 'Não identificado' }}</strong></div>
+        </div>
         <form method="post" action="/pagamentos/comprovantes/{{ pedido.comprovante.id }}/reanalisar">
           <input type="hidden" name="csrf" value="{{ csrf_token }}">
           <button class="button button-secondary button-small" type="submit">Analisar novamente</button>

@@ -108,7 +108,7 @@ def payment_page(request: Request, order_id: int):
         "desconto": format_price(order.desconto_centavos) if order.desconto_centavos else None,
         "pago": order.pago,
         "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in order_items],
-        "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro} if receipt else None,
+        "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro, "valor": f"R$ {receipt.ocr_valor.replace('.', ',')}" if receipt.ocr_valor else None, "pagador": receipt.ocr_pagador, "destinatario": receipt.ocr_destinatario} if receipt else None,
     }
     seller_data = {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "chave_pix": seller_profile.chave_pix}
     buyer_data = {"id": buyer.id, "nome": buyer.nome, "foto": buyer.foto} if buyer else None

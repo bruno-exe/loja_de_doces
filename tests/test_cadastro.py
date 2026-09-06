@@ -945,6 +945,9 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         assert "Texto extraído do comprovante" in receipt_page.text
         assert "Valor: R$ 19,00" in receipt_page.text
         assert "Destinatário: VENDEDOR REAL DA SILVA" in receipt_page.text
+        assert "<span>Valor</span><strong>R$ 19,00</strong>" in receipt_page.text
+        assert "<span>Pagador</span><strong>CLIENTE DE TESTE</strong>" in receipt_page.text
+        assert "<span>Quem recebeu</span><strong>VENDEDOR REAL DA SILVA</strong>" in receipt_page.text
         assert "Analisar novamente" in receipt_page.text
 
         with SessionLocal() as database:

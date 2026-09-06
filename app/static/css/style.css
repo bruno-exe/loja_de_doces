@@ -746,6 +746,10 @@ h1 {
 .receipt-ocr-result { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .receipt-ocr-result h3 { margin: 0 0 10px; font-family: Georgia,serif; font-size: 1.25rem; }
 .receipt-ocr-result pre { max-height: 360px; margin: 0; padding: 15px; overflow: auto; color: #3e3029; border: 1px solid var(--line); border-radius: 13px; background: #faf7f4; font-family: Consolas,monospace; font-size: .8rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.receipt-extracted-summary { margin: 14px 0; display: grid; gap: 8px; }
+.receipt-extracted-summary div { padding: 10px 12px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 12px; background: #fffaf5; }
+.receipt-extracted-summary span { color: var(--chocolate-soft); font-size: .76rem; font-weight: 750; }
+.receipt-extracted-summary strong { overflow-wrap: anywhere; font-size: .94rem; }
 
 @media (max-width: 560px) {
   .purchases-page { width: calc(100% - 28px); padding: 40px 0 58px; }
