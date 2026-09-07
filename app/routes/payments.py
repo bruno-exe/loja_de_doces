@@ -106,6 +106,8 @@ def process_receipt_ocr(receipt_id: int, *, force: bool = False) -> None:
             if order and _receipt_matches_order(data, order, seller_profile):
                 order.pago = True
                 order.confirmado = True
+                if order.desconto_centavos > 0 and not database.scalar(select(LancamentoPontos.id).where(LancamentoPontos.comprovante_id == receipt.id)):
+                    database.add(LancamentoPontos(usuario_id=order.cliente_id, comprovante_id=receipt.id, quantidade=250, motivo="Pagamento promocional validado"))
         except PixReceiptOcrError as exc:
             receipt.ocr_erro = str(exc)
         except Exception:
@@ -164,6 +166,7 @@ def payment_page(request: Request, order_id: int):
             query = query.where(or_(Pedido.cliente_id == user.id, Pedido.vendedor_id == user.id))
         row = database.execute(query).first()
         receipt = database.scalar(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == order_id))
+        receipt_points = database.scalar(select(LancamentoPontos.quantidade).where(LancamentoPontos.comprovante_id == receipt.id)) if receipt else None
         seller_mp = database.scalar(select(IntegracaoMercadoPagoVendedor.id).where(
             IntegracaoMercadoPagoVendedor.vendedor_id == row[0].vendedor_id,
             IntegracaoMercadoPagoVendedor.ativo.is_(True),
@@ -191,7 +194,7 @@ def payment_page(request: Request, order_id: int):
         "desconto": format_price(order.desconto_centavos) if order.desconto_centavos else None,
         "pago": order.pago,
         "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in order_items],
-        "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "processando": receipt.ocr_processado_em is None, "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro, "valor": f"R$ {receipt.ocr_valor.replace('.', ',')}" if receipt.ocr_valor else None, "pagador": receipt.ocr_pagador, "destinatario": receipt.ocr_destinatario, "data_hora": format_receipt_datetime(receipt.ocr_data, receipt.ocr_hora)} if receipt else None,
+        "comprovante": {"id": receipt.id, "enviado_em": format_brasilia_datetime(receipt.enviado_em), "processando": receipt.ocr_processado_em is None, "pontos_recebidos": int(receipt_points or 0), "texto_ocr": receipt.texto_ocr, "ocr_erro": receipt.ocr_erro, "valor": f"R$ {receipt.ocr_valor.replace('.', ',')}" if receipt.ocr_valor else None, "pagador": receipt.ocr_pagador, "destinatario": receipt.ocr_destinatario, "data_hora": format_receipt_datetime(receipt.ocr_data, receipt.ocr_hora)} if receipt else None,
     }
     seller_data = {"id": seller.id, "nome": seller.nome, "foto": seller.foto, "chave_pix": seller_profile.chave_pix}
     buyer_data = {"id": buyer.id, "nome": buyer.nome, "foto": buyer.foto} if buyer else None
@@ -233,12 +236,6 @@ async def upload_payment_receipt(request: Request, order_id: int, comprovante: U
             receipt = ComprovantePagamento(pedido_id=order_id, cliente_id=user.id, arquivo=filename)
             database.add(receipt)
             database.flush()
-            database.add(LancamentoPontos(
-                usuario_id=user.id,
-                comprovante_id=receipt.id,
-                quantidade=250,
-                motivo="Comprovante de pagamento enviado",
-            ))
             pending_cart_items = database.scalars(
                 select(ItemCarrinho).where(ItemCarrinho.cliente_id == user.id, ItemCarrinho.pedido_pendente_id == order_id)
             ).all()

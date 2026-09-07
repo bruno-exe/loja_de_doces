@@ -297,6 +297,7 @@ async def buy_product(
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
 
         discount_total = (quantidade // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
+        points_charge = 26 if discount_total else 0
         order = Pedido(
                 cliente_id=usuario.id,
                 vendedor_id=product.vendedor_id,
@@ -306,7 +307,7 @@ async def buy_product(
                 produto_imagem=product.imagem,
                 valor_unitario_centavos=product.valor_centavos,
                 quantidade=quantidade,
-                valor_total_centavos=product.valor_centavos * quantidade - discount_total,
+                valor_total_centavos=product.valor_centavos * quantidade - discount_total + points_charge,
                 desconto_centavos=discount_total,
                 pagar_depois=pagar_depois,
                 entregar_aqui=entregar_aqui,

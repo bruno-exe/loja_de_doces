@@ -41,8 +41,11 @@
       const discountLine = document.createElement("strong");
       discountLine.textContent = `Desconto de ${formatMoney(appliedDiscount)} aplicado!`;
       const totalLine = document.createElement("span");
-      totalLine.textContent = `Total a pagar: ${formatMoney(originalValue - appliedDiscount)}`;
+      totalLine.textContent = `Total a pagar: ${formatMoney(originalValue - appliedDiscount + 26)}`;
       promotionMessage.append(originalLine, discountLine, totalLine);
+      const pointsLine = document.createElement("small");
+      pointsLine.textContent = "Inclui R$ 0,26 para receber 250 pontos após a validação do comprovante.";
+      promotionMessage.append(pointsLine);
       if (missing > 0) {
         const nextDiscount = document.createElement("small");
         nextDiscount.textContent = `Adicione mais ${missing} ${missing === 1 ? "item" : "itens"} para ganhar outro desconto.`;

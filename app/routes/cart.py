@@ -14,6 +14,7 @@ from .products import format_price
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent.parent / "templates")
+PROMOTIONAL_POINTS_CHARGE_CENTS = 26
 
 
 @router.get("/carrinho/quantidade")
@@ -54,6 +55,7 @@ def cart_page(request: Request):
         promotions = []
         subtotal = sum(group["subtotal"] for group in grouped_products.values())
         total_discount = 0
+        total_points_charge = 0
         for group in grouped_products.values():
             threshold = group["quantidade_desconto"]
             discount_value = group["valor_desconto_centavos"]
@@ -63,8 +65,11 @@ def cart_page(request: Request):
             applied_discount = kits * discount_value
             group["desconto_centavos"] = applied_discount
             group["desconto"] = format_price(applied_discount)
-            group["total"] = format_price(group["subtotal"] - applied_discount)
+            points_charge = PROMOTIONAL_POINTS_CHARGE_CENTS if applied_discount else 0
+            group["taxa_pontos_centavos"] = points_charge
+            group["total"] = format_price(group["subtotal"] - applied_discount + points_charge)
             total_discount += applied_discount
+            total_points_charge += points_charge
             remainder = group["quantidade"] % threshold
             missing = 0 if remainder == 0 and group["quantidade"] > 0 else threshold - remainder
             promotions.append({"produto": group["produto"], "desconto": format_price(applied_discount) if applied_discount else None, "faltam": missing, "desconto_kit": format_price(discount_value), "quantidade_kit": threshold})
@@ -73,7 +78,7 @@ def cart_page(request: Request):
                 group["desconto_centavos"] = 0
                 group["desconto"] = format_price(0)
                 group["total"] = format_price(group["subtotal"])
-    summary = {"subtotal": format_price(subtotal), "desconto": format_price(total_discount), "total": format_price(subtotal - total_discount)}
+    summary = {"subtotal": format_price(subtotal), "desconto": format_price(total_discount), "taxa_pontos": format_price(total_points_charge), "taxa_pontos_centavos": total_points_charge, "total": format_price(subtotal - total_discount + total_points_charge)}
     return templates.TemplateResponse(request=request, name="carrinho.html", context={"usuario": user, "csrf_token": csrf_token(request), "produtos": list(grouped_products.values()), "promocoes": promotions, "resumo": summary})
 
 
@@ -99,7 +104,8 @@ def finish_cart_product(request: Request, product_id: int, forma_pagamento: str 
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não aceita pagamento posterior.")
         total_quantity = sum(item.quantidade for item in cart_items)
         discount = (total_quantity // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
-        order = Pedido(cliente_id=user.id, vendedor_id=product.vendedor_id, produto_id=product.id, produto_nome=product.nome, produto_descricao=product.descricao, produto_imagem=product.imagem, valor_unitario_centavos=product.valor_centavos, quantidade=total_quantity, valor_total_centavos=product.valor_centavos * total_quantity - discount, desconto_centavos=discount, pagar_depois=forma_pagamento == "depois", entregar_aqui=any(item.entregar_aqui for item in cart_items), pago=False, status="recebido", confirmado=forma_pagamento == "depois")
+        points_charge = PROMOTIONAL_POINTS_CHARGE_CENTS if discount else 0
+        order = Pedido(cliente_id=user.id, vendedor_id=product.vendedor_id, produto_id=product.id, produto_nome=product.nome, produto_descricao=product.descricao, produto_imagem=product.imagem, valor_unitario_centavos=product.valor_centavos, quantidade=total_quantity, valor_total_centavos=product.valor_centavos * total_quantity - discount + points_charge, desconto_centavos=discount, pagar_depois=forma_pagamento == "depois", entregar_aqui=any(item.entregar_aqui for item in cart_items), pago=False, status="recebido", confirmado=forma_pagamento == "depois")
         database.add(order)
         database.flush()
         variation_names = {variation.id: variation.nome for variation in variation_rows}

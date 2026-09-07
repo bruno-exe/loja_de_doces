@@ -80,16 +80,10 @@ async def lifespan(_: FastAPI):
             if column_name not in receipt_columns:
                 connection.execute(text(f"ALTER TABLE comprovantes_pagamentos ADD COLUMN {column_name} {column_type}"))
         connection.execute(text(
-            "INSERT INTO lancamentos_pontos (usuario_id, comprovante_id, quantidade, motivo, criado_em) "
-            "SELECT cliente_id, id, 250, 'Comprovante de pagamento enviado', enviado_em "
-            "FROM comprovantes_pagamentos AS comprovante "
-            "WHERE NOT EXISTS (SELECT 1 FROM lancamentos_pontos AS lancamento "
-            "WHERE lancamento.comprovante_id = comprovante.id)"
-        ))
-        connection.execute(text(
-            "UPDATE lancamentos_pontos SET quantidade = 250 "
-            "WHERE comprovante_id IS NOT NULL AND quantidade = 1 "
-            "AND motivo = 'Comprovante de pagamento enviado'"
+            "DELETE FROM lancamentos_pontos WHERE comprovante_id IS NOT NULL "
+            "AND motivo = 'Comprovante de pagamento enviado' "
+            "AND comprovante_id IN (SELECT comprovante.id FROM comprovantes_pagamentos AS comprovante "
+            "JOIN pedidos AS pedido ON pedido.id = comprovante.pedido_id WHERE pedido.desconto_centavos <= 0)"
         ))
         point_columns = {column["name"] for column in inspect(engine).get_columns("lancamentos_pontos")}
         if "deposito_id" not in point_columns:

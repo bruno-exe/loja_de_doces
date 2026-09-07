@@ -787,10 +787,12 @@ def test_customer_selects_multiple_product_variations() -> None:
         assert "Bombom" in cart.text
         assert "Chocolate" in cart.text
         assert "Morango" in cart.text
-        assert "R$ 8,00" in cart.text
+        assert "R$ 8,26" in cart.text
+        assert "Inclui R$ 0,26 para receber 250 pontos" in cart.text
         assert "R$ 4,00 de desconto aplicado." in cart.text
         assert "Subtotal</dt><dd>R$ 12,00" in cart.text
-        assert "Total</dt><dd>R$ 8,00" in cart.text
+        assert "Programa de pontos</dt><dd>+ R$ 0,26" in cart.text
+        assert "Total</dt><dd>R$ 8,26" in cart.text
         assert 'href="/carrinho"' in cart.text
 
         with SessionLocal() as database:
@@ -849,7 +851,7 @@ def test_customer_selects_multiple_product_variations() -> None:
     with SessionLocal() as database:
         order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product.id, Pedido.quantidade == 3))
         assert order.quantidade == 3
-        assert order.valor_total_centavos == 800
+        assert order.valor_total_centavos == 826
         assert order.desconto_centavos == 400
         items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
         assert [(item.variacao_nome, item.quantidade) for item in items] == [("Chocolate", 1), ("Morango", 2)]
@@ -945,7 +947,8 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
             assert database.get(Pedido, provisional_order.id).confirmado is True
         receipt_page = buyer_client.get(uploaded.headers["location"])
         assert "Comprovante anexado" in receipt_page.text
-        assert "Você ganhou 250 pontos!" in receipt_page.text
+        assert "Comprovante anexado e enviado para análise." in receipt_page.text
+        assert "Você recebeu 250 pontos!" not in receipt_page.text
         assert "não pode ser apagado ou substituído" in receipt_page.text
         assert "Anexar comprovante" not in receipt_page.text
         assert "Texto extraído do comprovante" in receipt_page.text
@@ -990,13 +993,11 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         points_page = buyer_client.get("/pontos")
         assert points_page.status_code == 200
         assert "pontos acumulados" in points_page.text
-        assert ">250</strong>" in points_page.text
+        assert ">0</strong>" in points_page.text
         with SessionLocal() as database:
             assert len(database.scalars(select(ComprovantePagamento).where(ComprovantePagamento.pedido_id == receipt.pedido_id)).all()) == 1
             point_entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.usuario_id == buyer.id)).all()
-            assert len(point_entries) == 1
-            assert point_entries[0].quantidade == 250
-            assert point_entries[0].comprovante_id == receipt.id
+            assert point_entries == []
 
         purchases = buyer_client.get(f"/minhas-compras/vendedores/{seller.id}")
         assert "Pagamento pendente" in purchases.text
@@ -1035,6 +1036,42 @@ def test_receipt_validation_requires_value_date_and_recipient_first_name() -> No
     assert payment_routes._receipt_matches_order({**valid, "valor": Decimal("4.99")}, order, profile) is False
     assert payment_routes._receipt_matches_order({**valid, "data": "2026-09-03"}, order, profile) is False
     assert payment_routes._receipt_matches_order({**valid, "destinatario": "Bruno Araujo"}, order, profile) is False
+
+
+def test_validated_promotional_receipt_awards_points_once(tmp_path, monkeypatch) -> None:
+    seller = create_test_user("pontos-promocao-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("pontos-promocao-comprador@teste.com", "comprador")
+    monkeypatch.setattr(payment_routes, "RECEIPT_DIR", tmp_path)
+    monkeypatch.setattr(payment_routes, "extract_pix_receipt", lambda path: {
+        "valor": Decimal("13.26"), "data": datetime.now().date().isoformat(), "hora": "12:00",
+        "destinatario": "Fernando Ribeiro", "cpf_cnpj_destinatario": None,
+        "pagador": "Cliente Teste", "instituicao": "Banco", "e2e_id": None,
+        "texto_ocr": "R$ 13,26",
+    })
+    with SessionLocal() as database:
+        profile = database.scalar(select(PerfilVendedor).where(PerfilVendedor.usuario_id == seller.id))
+        profile.nome_recebedor_pix = "Fernando Cesar Ribeiro Junior"
+        product = Produto(vendedor_id=seller.id, nome="Kit promocional", descricao="Teste", valor_centavos=500, quantidade_desconto=3, valor_desconto_centavos=200, imagem="kit.jpg")
+        database.add(product)
+        database.flush()
+        order = Pedido(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome=product.nome, valor_unitario_centavos=500, quantidade=3, valor_total_centavos=1326, desconto_centavos=200, confirmado=True)
+        database.add(order)
+        database.flush()
+        receipt = ComprovantePagamento(pedido_id=order.id, cliente_id=buyer.id, arquivo="promocao.jpg")
+        database.add(receipt)
+        database.commit()
+        receipt_id, order_id = receipt.id, order.id
+    (tmp_path / "promocao.jpg").touch()
+
+    payment_routes.process_receipt_ocr(receipt_id)
+    payment_routes.process_receipt_ocr(receipt_id, force=True)
+
+    with SessionLocal() as database:
+        assert database.get(Pedido, order_id).pago is True
+        entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.comprovante_id == receipt_id)).all()
+        assert len(entries) == 1
+        assert entries[0].quantidade == 250
+        assert entries[0].motivo == "Pagamento promocional validado"
 
 
 def test_receipt_queue_processes_only_one_item_at_a_time(monkeypatch) -> None:
