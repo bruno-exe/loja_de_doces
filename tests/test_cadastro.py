@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import os
 import tempfile
+import threading
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
@@ -863,6 +864,11 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         "e2e_id": "E1234567820260902ABCDEF1234567890",
         "texto_ocr": "Comprovante Pix\nValor: R$ 19,00\nDestinatário: VENDEDOR REAL DA SILVA",
     })
+    monkeypatch.setattr(
+        payment_routes,
+        "queue_receipt_ocr",
+        lambda receipt_id, force=False: payment_routes.process_receipt_ocr(receipt_id, force=force) or True,
+    )
     seller = create_test_user("pix-vendedor@teste.com", "vendedor")
     buyer = create_test_user("pix-comprador@teste.com", "comprador")
     with SessionLocal() as database:
@@ -945,9 +951,10 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         assert "Texto extraído do comprovante" in receipt_page.text
         assert "Valor: R$ 19,00" in receipt_page.text
         assert "Destinatário: VENDEDOR REAL DA SILVA" in receipt_page.text
-        assert "<span>Valor</span><strong>R$ 19,00</strong>" in receipt_page.text
-        assert "<span>Pagador</span><strong>CLIENTE DE TESTE</strong>" in receipt_page.text
-        assert "<span>Quem recebeu</span><strong>VENDEDOR REAL DA SILVA</strong>" in receipt_page.text
+        assert "<span>Valor:</span> <strong>R$ 19,00</strong>" in receipt_page.text
+        assert "<span>Pagador:</span> <strong>CLIENTE DE TESTE</strong>" in receipt_page.text
+        assert "<span>Quem recebeu:</span> <strong>VENDEDOR REAL DA SILVA</strong>" in receipt_page.text
+        assert "<span>Data e hora:</span> <strong>02/09/2026 às 10:30</strong>" in receipt_page.text
         assert "Analisar novamente" in receipt_page.text
 
         with SessionLocal() as database:
@@ -1015,6 +1022,98 @@ def test_immediate_purchase_redirects_to_pix_payment(tmp_path, monkeypatch) -> N
         other_client.post("/login", data={"csrf": csrf_from(login_page), "email": other.email, "senha": "senha-segura"})
         assert other_client.get(purchase.headers["location"]).status_code == 404
         assert other_client.get(f"/pagamentos/comprovantes/{receipt.id}/imagem").status_code == 404
+
+
+def test_receipt_validation_requires_value_date_and_recipient_first_name() -> None:
+    order = Pedido(
+        valor_total_centavos=500,
+        criado_em=datetime(2026, 9, 4, 18, 0, tzinfo=timezone.utc),
+    )
+    profile = PerfilVendedor(nome_recebedor_pix="Fernando Cesar Ribeiro Junior")
+    valid = {"valor": Decimal("5.00"), "data": "2026-09-04", "destinatario": "Fernando Ribeiro"}
+    assert payment_routes._receipt_matches_order(valid, order, profile) is True
+    assert payment_routes._receipt_matches_order({**valid, "valor": Decimal("4.99")}, order, profile) is False
+    assert payment_routes._receipt_matches_order({**valid, "data": "2026-09-03"}, order, profile) is False
+    assert payment_routes._receipt_matches_order({**valid, "destinatario": "Bruno Araujo"}, order, profile) is False
+
+
+def test_receipt_queue_processes_only_one_item_at_a_time(monkeypatch) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    state = {"active": 0, "maximum": 0, "count": 0}
+    guard = threading.Lock()
+
+    def fake_process(receipt_id):
+        with guard:
+            state["active"] += 1
+            state["maximum"] = max(state["maximum"], state["active"])
+        started.set()
+        release.wait(2)
+        with guard:
+            state["active"] -= 1
+            state["count"] += 1
+            if state["count"] == 2:
+                finished.set()
+
+    monkeypatch.setattr(payment_routes, "process_receipt_ocr", fake_process)
+    assert payment_routes.queue_receipt_ocr(900001) is True
+    assert started.wait(1)
+    assert payment_routes.queue_receipt_ocr(900002) is True
+    release.set()
+    assert finished.wait(2)
+    assert state["maximum"] == 1
+
+
+def test_admin_receipts_and_manual_payment_approval_are_restricted() -> None:
+    admin = create_test_user("bruno@criar", "comprador")
+    seller = create_test_user("adm-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("adm-comprador@teste.com", "comprador")
+    outsider = create_test_user("adm-outro@teste.com", "comprador")
+    with SessionLocal() as database:
+        seller_profile = database.scalar(select(PerfilVendedor).where(PerfilVendedor.usuario_id == seller.id))
+        seller_profile.nome_recebedor_pix = "Vendedor Real"
+        product = Produto(vendedor_id=seller.id, nome="Doce ADM", descricao="Teste", valor_centavos=500, imagem="doce.jpg")
+        database.add(product)
+        database.flush()
+        order = Pedido(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome=product.nome, valor_unitario_centavos=500, quantidade=1, valor_total_centavos=500, confirmado=True)
+        cash_order = Pedido(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome="Doce em dinheiro", valor_unitario_centavos=500, quantidade=1, valor_total_centavos=500, confirmado=True)
+        database.add_all([order, cash_order])
+        database.flush()
+        database.add(ComprovantePagamento(pedido_id=order.id, cliente_id=buyer.id, arquivo="adm.jpg", texto_ocr="R$ 5", ocr_valor="5.00", ocr_processado_em=datetime.now(timezone.utc)))
+        database.commit()
+        order_id, cash_order_id = order.id, cash_order.id
+
+    with TestClient(app) as outsider_client:
+        login = outsider_client.get("/login")
+        outsider_client.post("/login", data={"csrf": csrf_from(login), "email": outsider.email, "senha": "senha-segura"})
+        assert outsider_client.get("/adm").status_code == 404
+        assert outsider_client.get(f"/pagamentos/pedidos/{order_id}").status_code == 404
+
+    with TestClient(app) as admin_client:
+        login = admin_client.get("/login")
+        admin_client.post("/login", data={"csrf": csrf_from(login), "email": admin.email, "senha": "senha-segura"})
+        page = admin_client.get("/adm?loja=Vendedor&comprador=Cliente&situacao=Pendente")
+        assert page.status_code == 200
+        assert "ADM" in page.text and "Doce ADM" not in page.text
+        assert f'href="/pagamentos/pedidos/{order_id}"' in page.text
+        receipt_page = admin_client.get(f"/pagamentos/pedidos/{order_id}")
+        assert "Análise administrativa" in receipt_page.text
+        assert "Aprovar pagamento" in receipt_page.text
+        approved = admin_client.post(f"/pagamentos/pedidos/{order_id}/aprovar", data={"csrf": csrf_from(receipt_page)}, follow_redirects=False)
+        assert approved.headers["location"] == "/adm?aprovado=1"
+
+    with TestClient(app) as seller_client:
+        login = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login), "email": seller.email, "senha": "senha-segura"})
+        sales = seller_client.get(f"/vendas/clientes/{buyer.id}")
+        assert "Marcar como pago" in sales.text
+        marked = seller_client.post(f"/pagamentos/pedidos/{cash_order_id}/aprovar", data={"csrf": csrf_from(sales)}, follow_redirects=False)
+        assert marked.headers["location"] == f"/vendas/clientes/{buyer.id}?pago=1"
+
+    with SessionLocal() as database:
+        assert database.get(Pedido, order_id).pago is True
+        assert database.get(Pedido, cash_order_id).pago is True
 
 
 def test_buyer_and_seller_can_exchange_private_messages() -> None:

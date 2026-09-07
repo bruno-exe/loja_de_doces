@@ -31,6 +31,26 @@ def test_parses_real_paddle_example():
     assert result["confidence"]["valor"] == 0.87
 
 
+@pytest.mark.parametrize(
+    "source,expected_date,expected_time",
+    [
+        ("04/09/26 às 08:05", "2026-09-04", "08:05"),
+        ("04/08/2026 19:07:03", "2026-08-04", "19:07:03"),
+        ("4/setembro/2026 às 16:54:16", "2026-09-04", "16:54:16"),
+    ],
+)
+def test_recognizes_date_and_time_variations(source, expected_date, expected_time):
+    result = pix_receipt_ocr.parse_pix_receipt(source)
+    assert result["data"] == expected_date
+    assert result["hora"] == expected_time
+
+
+def test_ignores_invalid_time_before_valid_date_and_time():
+    result = pix_receipt_ocr.parse_pix_receipt("16:541\n04/09/2026 às 16:54:16")
+    assert result["data"] == "2026-09-04"
+    assert result["hora"] == "16:54:16"
+
+
 @pytest.mark.parametrize("source,expected", [("R$5", "5.00"), ("R$ 5,00", "5.00"), ("R$20,50", "20.50")])
 def test_normalizes_values(source, expected):
     assert pix_receipt_ocr.parse_pix_receipt(source)["valor"] == Decimal(expected)

@@ -747,9 +747,16 @@ h1 {
 .receipt-ocr-result h3 { margin: 0 0 10px; font-family: Georgia,serif; font-size: 1.25rem; }
 .receipt-ocr-result pre { max-height: 360px; margin: 0; padding: 15px; overflow: auto; color: #3e3029; border: 1px solid var(--line); border-radius: 13px; background: #faf7f4; font-family: Consolas,monospace; font-size: .8rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .receipt-extracted-summary { margin: 14px 0; display: grid; gap: 8px; }
-.receipt-extracted-summary div { padding: 10px 12px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 12px; background: #fffaf5; }
+.receipt-extracted-summary div { padding: 10px 12px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; border: 1px solid var(--line); border-radius: 12px; background: #fffaf5; }
 .receipt-extracted-summary span { color: var(--chocolate-soft); font-size: .76rem; font-weight: 750; }
 .receipt-extracted-summary strong { overflow-wrap: anywhere; font-size: .94rem; }
+.receipt-processing { margin: 12px 0; padding: 14px 16px; color: #76501f; border: 1px solid #f0cc91; border-radius: 13px; background: #fff4d8; font-weight: 750; }
+.admin-filters { margin: 20px 0; padding: 16px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) auto; align-items: end; gap: 12px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.admin-filters label { display: grid; gap: 5px; color: var(--chocolate-soft); font-size: .78rem; font-weight: 800; }
+.admin-filters input,.admin-filters select { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fffaf5; }
+.admin-receipt-list { display: grid; gap: 9px; }
+.admin-receipt-list > a { padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr auto auto; align-items: center; gap: 10px; color: inherit; text-decoration: none; border: 1px solid var(--line); border-radius: 14px; background: white; }
+@media (max-width:700px) { .admin-filters { grid-template-columns: 1fr; } .admin-receipt-list > a { grid-template-columns: 1fr auto; } .admin-receipt-list > a span:not(.payment-status),.admin-receipt-list > a small { grid-column: 1 / -1; } }
 
 @media (max-width: 560px) {
   .purchases-page { width: calc(100% - 28px); padding: 40px 0 58px; }

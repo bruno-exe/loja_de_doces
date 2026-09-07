@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}ADM · Come Doce{% endblock %}
+{% block content %}
+<section class="sales-page admin-page">
+  {% if request.query_params.get('aprovado') %}<div class="product-created-success" role="status">Pagamento aprovado com sucesso.</div>{% endif %}
+  <header class="purchases-heading"><span class="eyebrow">Administração</span><h1>Comprovantes</h1><p>Consulte os pagamentos enviados pelos compradores.</p></header>
+  <form class="admin-filters" method="get" action="/adm">
+    <label>Nome da loja<input name="loja" value="{{ filtros.loja }}" placeholder="Filtrar loja"></label>
+    <label>Comprador<input name="comprador" value="{{ filtros.comprador }}" placeholder="Filtrar comprador"></label>
+    <label>Situação<select name="situacao"><option value="">Todas</option>{% for opcao in ['Pendente','Processando','Pago'] %}<option value="{{ opcao }}" {% if filtros.situacao == opcao %}selected{% endif %}>{{ opcao }}</option>{% endfor %}</select></label>
+    <button class="button button-small" type="submit">Filtrar</button>
+  </form>
+  <div class="admin-receipt-list">
+    {% for item in itens %}<a href="/pagamentos/pedidos/{{ item.pedido_id }}"><strong>{{ item.loja }}</strong><span>{{ item.comprador }}</span><span class="payment-status {{ 'is-paid' if item.situacao == 'Pago' else 'is-pending' }}">{{ item.situacao }}</span><small>{{ 'Ver comprovante' if item.tem_comprovante else 'Sem comprovante' }}</small></a>{% else %}<p>Nenhum pedido encontrado com esses filtros.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

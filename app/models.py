@@ -155,7 +155,7 @@ class ComprovantePagamento(Base):
     enviado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ocr_valor: Mapped[str | None] = mapped_column(String(40), nullable=True)
     ocr_data: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    ocr_hora: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    ocr_hora: Mapped[str | None] = mapped_column(String(8), nullable=True)
     ocr_destinatario: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ocr_cpf_cnpj_destinatario: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ocr_pagador: Mapped[str | None] = mapped_column(String(255), nullable=True)

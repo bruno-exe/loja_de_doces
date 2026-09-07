@@ -16,7 +16,7 @@ from .routes.sweets import router as sweets_router
 from .routes.products import router as products_router
 from .routes.purchases import router as purchases_router
 from .routes.sales import router as sales_router
-from .routes.payments import router as payments_router
+from .routes.payments import queue_pending_receipts, router as payments_router
 from .routes.cart import router as cart_router
 from .routes.availability import router as availability_router
 from .routes.messages import router as messages_router
@@ -24,6 +24,7 @@ from .routes.points import router as points_router
 from .routes.point_deposits import router as point_deposits_router
 from .routes.mercadopago_oauth import router as mercadopago_oauth_router
 from .routes.order_mercadopago import router as order_mercadopago_router
+from .routes.admin import router as admin_router
 from .security import csrf_token
 from .session import current_user
 
@@ -94,6 +95,7 @@ async def lifespan(_: FastAPI):
         if "deposito_id" not in point_columns:
             connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN deposito_id INTEGER"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_deposito_id_unique ON lancamentos_pontos (deposito_id) WHERE deposito_id IS NOT NULL"))
+    queue_pending_receipts()
     yield
 
 
@@ -128,6 +130,7 @@ app.include_router(points_router)
 app.include_router(point_deposits_router)
 app.include_router(mercadopago_oauth_router)
 app.include_router(order_mercadopago_router)
+app.include_router(admin_router)
 
 
 @app.get("/", response_class=HTMLResponse)

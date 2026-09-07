@@ -2,11 +2,11 @@
 {% block title %}Pagamento · Come Doce{% endblock %}
 {% block content %}
 <section class="payment-page">
-  {% if visualizacao_vendedor %}<a class="back-link" href="/vendas/clientes/{{ cliente.id }}">← Voltar para Vendas</a>{% else %}<a class="back-link" href="/minhas-compras/vendedores/{{ vendedor.id }}">← Voltar para Minhas compras</a>{% endif %}
+  {% if visualizacao_adm %}<a class="back-link" href="/adm">← Voltar para ADM</a>{% elif visualizacao_vendedor %}<a class="back-link" href="/vendas/clientes/{{ cliente.id }}">← Voltar para Vendas</a>{% else %}<a class="back-link" href="/minhas-compras/vendedores/{{ vendedor.id }}">← Voltar para Minhas compras</a>{% endif %}
   <header class="payment-seller-header">
-    {% if visualizacao_vendedor %}
+    {% if visualizacao_vendedor or visualizacao_adm %}
       {% if cliente.foto %}<img src="/uploads/profile_photos/{{ cliente.foto }}" alt="Foto de {{ cliente.nome }}">{% else %}<span class="payment-seller-placeholder" aria-hidden="true">{{ cliente.nome[:1] | upper }}</span>{% endif %}
-      <div><span class="eyebrow">Comprovante recebido de</span><h1>{{ cliente.nome }}</h1></div>
+      <div><span class="eyebrow">{{ 'Análise administrativa' if visualizacao_adm else 'Comprovante recebido de' }}</span><h1>{{ cliente.nome }}</h1></div>
     {% else %}
       {% if vendedor.foto %}<img src="/uploads/profile_photos/{{ vendedor.foto }}" alt="Imagem de {{ vendedor.nome }}">{% else %}<span class="payment-seller-placeholder" aria-hidden="true">{{ vendedor.nome[:1] | upper }}</span>{% endif %}
       <div><span class="eyebrow">Pagamento para</span><h1>{{ vendedor.nome }}</h1></div>
@@ -19,7 +19,7 @@
     <div class="payment-order-total">{% if pedido.desconto %}<small>Desconto: - {{ pedido.desconto }}</small>{% endif %}<strong>{{ pedido.valor_total }}</strong></div>
   </article>
 
-  {% if not visualizacao_vendedor %}<section class="mercadopago-checkout-card">
+  {% if not visualizacao_vendedor and not visualizacao_adm %}<section class="mercadopago-checkout-card">
     <span class="eyebrow">Pagamento online</span><h2>Mercado Pago</h2>
     {% set mp_error = request.query_params.get('erro_mp') %}
     {% if mp_error %}<div class="form-errors" role="alert">{% if mp_error == 'sem_conta' %}Este vendedor ainda não configurou o recebimento pelo Mercado Pago.{% elif mp_error == 'indisponivel' %}Este pedido não está disponível para pagamento.{% elif mp_error == 'comprovante' %}Este pedido já possui um comprovante anexado.{% elif mp_error == 'endereco' %}O endereço público de pagamentos ainda não foi configurado.{% else %}Não foi possível abrir o Mercado Pago agora. Tente novamente.{% endif %}</div>{% endif %}
@@ -43,21 +43,25 @@
       <div class="receipt-saved" role="status"><strong>Comprovante anexado</strong><span>Enviado em {{ pedido.comprovante.enviado_em }}</span></div>
       <img class="receipt-preview" src="/pagamentos/comprovantes/{{ pedido.comprovante.id }}/imagem" alt="Comprovante anexado ao pedido">
       <p>O comprovante está salvo permanentemente neste pedido e não pode ser apagado ou substituído.</p>
+      {% if visualizacao_adm and not pedido.pago %}<form method="post" action="/pagamentos/pedidos/{{ pedido.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button" type="submit">Aprovar pagamento</button></form>{% endif %}
       <section class="receipt-ocr-result">
         <h3>Texto extraído do comprovante</h3>
-        {% if request.query_params.get('reanalisado') %}<div class="account-photo-success" role="status">Comprovante analisado novamente.</div>{% endif %}
-        {% if pedido.comprovante.texto_ocr %}<pre>{{ pedido.comprovante.texto_ocr }}</pre>{% else %}<div class="form-errors" role="alert">{{ pedido.comprovante.ocr_erro or 'Nenhum texto foi reconhecido na imagem.' }}</div>{% endif %}
+        {% if request.query_params.get('reanalisado') and not pedido.comprovante.processando %}<div class="account-photo-success" role="status">Comprovante analisado novamente.</div>{% endif %}
+        {% if pedido.comprovante.processando %}<div class="receipt-processing" role="status">O comprovante ainda está sendo processado. Recarregue esta página em alguns instantes.</div>{% elif pedido.comprovante.texto_ocr %}<pre>{{ pedido.comprovante.texto_ocr }}</pre>{% else %}<div class="form-errors" role="alert">{{ pedido.comprovante.ocr_erro or 'Nenhum texto foi reconhecido na imagem.' }}</div>{% endif %}
+        {% if not pedido.comprovante.processando %}
         <div class="receipt-extracted-summary">
-          <div><span>Valor</span><strong>{{ pedido.comprovante.valor or 'Não identificado' }}</strong></div>
-          <div><span>Pagador</span><strong>{{ pedido.comprovante.pagador or 'Não identificado' }}</strong></div>
-          <div><span>Quem recebeu</span><strong>{{ pedido.comprovante.destinatario or 'Não identificado' }}</strong></div>
+          <div><span>Valor:</span> <strong>{{ pedido.comprovante.valor or 'Não encontrado' }}</strong></div>
+          <div><span>Pagador:</span> <strong>{{ pedido.comprovante.pagador or 'Não encontrado' }}</strong></div>
+          <div><span>Quem recebeu:</span> <strong>{{ pedido.comprovante.destinatario or 'Não encontrado' }}</strong></div>
+          <div><span>Data e hora:</span> <strong>{{ pedido.comprovante.data_hora or 'Não encontrado' }}</strong></div>
         </div>
         <form method="post" action="/pagamentos/comprovantes/{{ pedido.comprovante.id }}/reanalisar">
           <input type="hidden" name="csrf" value="{{ csrf_token }}">
           <button class="button button-secondary button-small" type="submit">Analisar novamente</button>
         </form>
+        {% endif %}
       </section>
-    {% elif visualizacao_vendedor %}
+    {% elif visualizacao_vendedor or visualizacao_adm %}
       <div class="form-errors" role="status">O comprador ainda não anexou um comprovante para este pedido.</div>
     {% else %}
       {% set receipt_error = request.query_params.get('erro_comprovante') %}
