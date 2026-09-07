@@ -34,6 +34,7 @@ class PerfilComprador(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), unique=True, index=True)
+    chave_pix: Mapped[str | None] = mapped_column(String(140), nullable=True)
     usuario: Mapped[Usuario] = relationship(back_populates="perfil_comprador")
 
 
@@ -209,7 +210,54 @@ class LancamentoPontos(Base):
     deposito_id: Mapped[int | None] = mapped_column(
         ForeignKey("depositos_pontos.id"), unique=True, nullable=True, index=True
     )
+    solicitacao_id: Mapped[int | None] = mapped_column(ForeignKey("solicitacoes_pontos.id"), unique=True, nullable=True, index=True)
     quantidade: Mapped[int] = mapped_column(Integer)
+    motivo: Mapped[str] = mapped_column(String(160))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+
+class SolicitacaoPontos(Base):
+    __tablename__ = "solicitacoes_pontos"
+    __table_args__ = (
+        CheckConstraint("tipo IN ('saque', 'compra')", name="ck_solicitacoes_pontos_tipo"),
+        CheckConstraint("status IN ('pendente', 'liquidada', 'cancelada')", name="ck_solicitacoes_pontos_status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    destinatario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    tipo: Mapped[str] = mapped_column(String(20))
+    pontos: Mapped[int] = mapped_column(Integer)
+    valor_centavos: Mapped[int] = mapped_column(Integer)
+    chave_pix_destino: Mapped[str] = mapped_column(String(140))
+    status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    liquidado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ObrigacaoCustodia(Base):
+    __tablename__ = "obrigacoes_custodia"
+    __table_args__ = (CheckConstraint("status IN ('pendente', 'compensada', 'paga')", name="ck_obrigacoes_custodia_status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    solicitacao_id: Mapped[int] = mapped_column(ForeignKey("solicitacoes_pontos.id"), index=True)
+    custodiante_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    destinatario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    valor_centavos: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    pago_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MovimentoCustodia(Base):
+    __tablename__ = "movimentos_custodia"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    comprovante_id: Mapped[int | None] = mapped_column(ForeignKey("comprovantes_pagamentos.id"), unique=True, nullable=True, index=True)
+    obrigacao_id: Mapped[int | None] = mapped_column(ForeignKey("obrigacoes_custodia.id"), unique=True, nullable=True, index=True)
+    custodia_centavos: Mapped[int] = mapped_column(Integer, default=0)
+    reserva_centavos: Mapped[int] = mapped_column(Integer, default=0)
     motivo: Mapped[str] = mapped_column(String(160))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 

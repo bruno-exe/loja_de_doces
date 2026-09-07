@@ -6,10 +6,11 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 
 from ..database import SessionLocal
-from ..models import ItemCarrinho, ItemPedido, Pedido, Produto, Usuario, VariacaoProduto
+from ..models import ItemCarrinho, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario, VariacaoProduto
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from .products import format_price
+from .custody import POINTS_PER_CENT, REDEMPTION_LOCK, RedemptionError, create_points_redemption
 
 
 router = APIRouter()
@@ -88,7 +89,7 @@ def finish_cart_product(request: Request, product_id: int, forma_pagamento: str 
     user = current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    if forma_pagamento not in {"agora", "depois"}:
+    if forma_pagamento not in {"agora", "depois", "pontos"}:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Forma de pagamento inválida.")
     with SessionLocal() as database:
         product = database.get(Produto, product_id)
@@ -104,10 +105,22 @@ def finish_cart_product(request: Request, product_id: int, forma_pagamento: str 
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não aceita pagamento posterior.")
         total_quantity = sum(item.quantidade for item in cart_items)
         discount = (total_quantity // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
-        points_charge = PROMOTIONAL_POINTS_CHARGE_CENTS if discount else 0
-        order = Pedido(cliente_id=user.id, vendedor_id=product.vendedor_id, produto_id=product.id, produto_nome=product.nome, produto_descricao=product.descricao, produto_imagem=product.imagem, valor_unitario_centavos=product.valor_centavos, quantidade=total_quantity, valor_total_centavos=product.valor_centavos * total_quantity - discount + points_charge, desconto_centavos=discount, pagar_depois=forma_pagamento == "depois", entregar_aqui=any(item.entregar_aqui for item in cart_items), pago=False, status="recebido", confirmado=forma_pagamento == "depois")
+        points_charge = PROMOTIONAL_POINTS_CHARGE_CENTS if discount and forma_pagamento != "pontos" else 0
+        total_cents = product.valor_centavos * total_quantity - discount + points_charge
+        order = Pedido(cliente_id=user.id, vendedor_id=product.vendedor_id, produto_id=product.id, produto_nome=product.nome, produto_descricao=product.descricao, produto_imagem=product.imagem, valor_unitario_centavos=product.valor_centavos, quantidade=total_quantity, valor_total_centavos=total_cents, desconto_centavos=discount, pagar_depois=forma_pagamento == "depois", entregar_aqui=any(item.entregar_aqui for item in cart_items), pago=forma_pagamento == "pontos", status="recebido", confirmado=forma_pagamento in {"depois", "pontos"})
         database.add(order)
         database.flush()
+        if forma_pagamento == "pontos":
+            seller_profile = database.scalar(select(PerfilVendedor).where(PerfilVendedor.usuario_id == product.vendedor_id))
+            if not seller_profile or not seller_profile.chave_pix:
+                database.rollback()
+                return RedirectResponse("/carrinho?erro_pontos=pix", status_code=status.HTTP_303_SEE_OTHER)
+            try:
+                with REDEMPTION_LOCK:
+                    create_points_redemption(database, owner_id=user.id, recipient_id=product.vendedor_id, kind="compra", points=total_cents * POINTS_PER_CENT, pix_key=seller_profile.chave_pix)
+            except RedemptionError as exc:
+                database.rollback()
+                return RedirectResponse(f"/carrinho?erro_pontos={exc}", status_code=status.HTTP_303_SEE_OTHER)
         variation_names = {variation.id: variation.nome for variation in variation_rows}
         database.add_all(ItemPedido(pedido_id=order.id, variacao_id=item.variacao_id, variacao_nome=variation_names.get(item.variacao_id, product.nome), quantidade=item.quantidade) for item in cart_items)
         if forma_pagamento == "agora":

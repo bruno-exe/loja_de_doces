@@ -16,7 +16,7 @@ from PIL import Image, UnidentifiedImageError
 
 from ..database import SessionLocal
 from ..admin_access import is_admin
-from ..models import ComprovantePagamento, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, PagamentoPedidoMercadoPago, Pedido, PerfilVendedor, Produto, Usuario
+from ..models import ComprovantePagamento, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, MovimentoCustodia, PagamentoPedidoMercadoPago, Pedido, PerfilVendedor, Produto, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
@@ -108,6 +108,8 @@ def process_receipt_ocr(receipt_id: int, *, force: bool = False) -> None:
                 order.confirmado = True
                 if order.desconto_centavos > 0 and not database.scalar(select(LancamentoPontos.id).where(LancamentoPontos.comprovante_id == receipt.id)):
                     database.add(LancamentoPontos(usuario_id=order.cliente_id, comprovante_id=receipt.id, quantidade=250, motivo="Pagamento promocional validado"))
+                if order.desconto_centavos > 0 and not database.scalar(select(MovimentoCustodia.id).where(MovimentoCustodia.comprovante_id == receipt.id)):
+                    database.add(MovimentoCustodia(vendedor_id=order.vendedor_id, comprovante_id=receipt.id, custodia_centavos=25, reserva_centavos=1, motivo="Custódia de promoção validada"))
         except PixReceiptOcrError as exc:
             receipt.ocr_erro = str(exc)
         except Exception:

@@ -50,6 +50,7 @@
         <a id="sideMenuCart" href="/carrinho" {% if request.url.path == '/carrinho' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Carrinho</a>
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/vendas" {% if request.url.path.startswith('/vendas') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128200;</span> Vendas</a>{% endif %}
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/pausar" {% if request.url.path == '/pausar' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9208;</span> Pausar</a>{% endif %}
+        {% if usuario.tipo_conta == 'vendedor' %}<a href="/a-pagar" {% if request.url.path.startswith('/a-pagar') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128176;</span> A pagar</a>{% endif %}
         {% if usuario.email|lower == 'bruno@criar' %}<a href="/adm" {% if request.url.path.startswith('/adm') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9881;</span> ADM</a>{% endif %}
       </div>
     </nav>

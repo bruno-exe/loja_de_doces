@@ -956,6 +956,15 @@ h1 {
 .ranking-top-1 { border-color: #e0b94e; background: #fffaf0; }
 .ranking-top-2 { border-color: #c6cbd1; }
 .ranking-top-3 { border-color: #c98b5c; }
+.custody-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.custody-summary article,.payable-list > article { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.custody-summary article { display: grid; gap: 4px; }
+.custody-summary span { color: var(--chocolate-soft); font-size: .78rem; }
+.custody-summary strong { color: #a84e0b; font-size: 1.25rem; }
+.payable-list { margin-top: 18px; display: grid; gap: 10px; }
+.payable-list > article > div { display: flex; align-items: center; gap: 10px; }
+.payable-list img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.payable-list small { display: block; color: var(--chocolate-soft); }
 
 @media (max-width: 620px) {
   .points-page { width: calc(100% - 28px); padding: 40px 0 58px; }
@@ -965,4 +974,5 @@ h1 {
   .ranking-item { grid-template-columns: 36px 46px minmax(0,1fr); padding: 10px; gap: 9px; }
   .ranking-item img,.ranking-photo-placeholder { width: 46px; height: 46px; }
   .ranking-points { grid-column: 3; font-size: .82rem; }
+  .custody-summary { grid-template-columns: 1fr; }
 }

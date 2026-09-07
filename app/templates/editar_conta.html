@@ -63,6 +63,15 @@
     </form>
   </div>
 
+  {% if usuario.tipo_conta == 'comprador' %}
+    <section class="seller-presentation-editor">
+      <div><span class="eyebrow">Resgate de pontos</span><h2>Chave Pix</h2><p>Esta chave será usada para receber saques solicitados na página de pontos.</p></div>
+      {% if request.query_params.get('erro_pix_comprador') %}<div class="form-errors" role="alert">Informe uma chave Pix com no máximo 140 caracteres.</div>{% endif %}
+      {% if request.query_params.get('pix_comprador_salva') %}<div class="account-photo-success">Chave Pix salva.</div>{% endif %}
+      <form method="post" action="/conta/pix-comprador"><input type="hidden" name="csrf" value="{{ csrf_token }}"><label class="field-label">Chave Pix para receber saques<input name="chave_pix" maxlength="140" required value="{{ perfil_comprador.chave_pix if perfil_comprador and perfil_comprador.chave_pix else '' }}"></label><button class="button" type="submit">Salvar chave Pix</button></form>
+    </section>
+  {% endif %}
+
   {% if usuario.tipo_conta == 'vendedor' %}
     <section class="seller-presentation-editor">
       <div>

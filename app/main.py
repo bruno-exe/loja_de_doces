@@ -25,6 +25,7 @@ from .routes.point_deposits import router as point_deposits_router
 from .routes.mercadopago_oauth import router as mercadopago_oauth_router
 from .routes.order_mercadopago import router as order_mercadopago_router
 from .routes.admin import router as admin_router
+from .routes.custody import router as custody_router
 from .security import csrf_token
 from .session import current_user
 
@@ -42,6 +43,10 @@ async def lifespan(_: FastAPI):
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE usuarios ADD COLUMN foto VARCHAR(255)"))
     seller_profile_columns = {column["name"] for column in inspect(engine).get_columns("perfis_vendedores")}
+    buyer_profile_columns = {column["name"] for column in inspect(engine).get_columns("perfis_compradores")}
+    if "chave_pix" not in buyer_profile_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE perfis_compradores ADD COLUMN chave_pix VARCHAR(140)"))
     if "chave_pix" not in seller_profile_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE perfis_vendedores ADD COLUMN chave_pix VARCHAR(140)"))
@@ -88,7 +93,17 @@ async def lifespan(_: FastAPI):
         point_columns = {column["name"] for column in inspect(engine).get_columns("lancamentos_pontos")}
         if "deposito_id" not in point_columns:
             connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN deposito_id INTEGER"))
+        if "solicitacao_id" not in point_columns:
+            connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN solicitacao_id INTEGER"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_deposito_id_unique ON lancamentos_pontos (deposito_id) WHERE deposito_id IS NOT NULL"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_solicitacao_id_unique ON lancamentos_pontos (solicitacao_id) WHERE solicitacao_id IS NOT NULL"))
+        connection.execute(text(
+            "INSERT INTO movimentos_custodia (vendedor_id, comprovante_id, obrigacao_id, custodia_centavos, reserva_centavos, motivo, criado_em) "
+            "SELECT pedido.vendedor_id, comprovante.id, NULL, 25, 1, 'Custódia de promoção validada', comprovante.enviado_em "
+            "FROM comprovantes_pagamentos AS comprovante JOIN pedidos AS pedido ON pedido.id = comprovante.pedido_id "
+            "WHERE pedido.desconto_centavos > 0 AND pedido.pago = 1 "
+            "AND NOT EXISTS (SELECT 1 FROM movimentos_custodia AS movimento WHERE movimento.comprovante_id = comprovante.id)"
+        ))
     queue_pending_receipts()
     yield
 
@@ -125,6 +140,7 @@ app.include_router(point_deposits_router)
 app.include_router(mercadopago_oauth_router)
 app.include_router(order_mercadopago_router)
 app.include_router(admin_router)
+app.include_router(custody_router)
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -63,6 +63,7 @@ def edit_account(request: Request):
     if not usuario:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     seller_profile = None
+    buyer_profile = None
     mercadopago_integration = None
     if usuario.tipo_conta == "vendedor":
         with SessionLocal() as database:
@@ -75,10 +76,13 @@ def edit_account(request: Request):
             ))
             if integration:
                 mercadopago_integration = {"user_id": integration.mercadopago_user_id, "connected_at": format_brasilia_datetime(integration.conectado_em), "status": "Conectada"}
+    else:
+        with SessionLocal() as database:
+            buyer_profile = database.scalar(select(PerfilComprador).where(PerfilComprador.usuario_id == usuario.id))
     return templates.TemplateResponse(
         request=request,
         name="editar_conta.html",
-        context={"usuario": usuario, "perfil_vendedor": seller_profile, "csrf_token": csrf_token(request), "mercadopago_integration": mercadopago_integration, "mercadopago_oauth_configured": oauth_configured()},
+        context={"usuario": usuario, "perfil_vendedor": seller_profile, "perfil_comprador": buyer_profile, "csrf_token": csrf_token(request), "mercadopago_integration": mercadopago_integration, "mercadopago_oauth_configured": oauth_configured()},
     )
 
 
@@ -129,6 +133,24 @@ def update_seller_pix(request: Request, chave_pix: str = Form(""), nome_recebedo
         profile.nome_recebedor_pix = receiver_name or None
         database.commit()
     return RedirectResponse("/conta/editar?pix_salva=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/conta/pix-comprador")
+def update_buyer_pix(request: Request, chave_pix: str = Form(""), csrf: str = Form(...)):
+    validate_csrf(request, csrf)
+    usuario = current_user(request)
+    if not usuario:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if usuario.tipo_conta != "comprador":
+        return RedirectResponse("/perfil", status_code=status.HTTP_303_SEE_OTHER)
+    pix = chave_pix.strip()
+    if not pix or len(pix) > 140:
+        return RedirectResponse("/conta/editar?erro_pix_comprador=1", status_code=status.HTTP_303_SEE_OTHER)
+    with SessionLocal() as database:
+        profile = database.scalar(select(PerfilComprador).where(PerfilComprador.usuario_id == usuario.id))
+        profile.chave_pix = pix
+        database.commit()
+    return RedirectResponse("/conta/editar?pix_comprador_salva=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/conta/foto")

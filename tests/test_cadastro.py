@@ -22,7 +22,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, PagamentoPedidoMercadoPago, Pedido, PerfilComprador, PerfilVendedor, Produto, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, MovimentoCustodia, ObrigacaoCustodia, PagamentoPedidoMercadoPago, Pedido, PerfilComprador, PerfilVendedor, Produto, SolicitacaoPontos, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -1072,6 +1072,82 @@ def test_validated_promotional_receipt_awards_points_once(tmp_path, monkeypatch)
         assert len(entries) == 1
         assert entries[0].quantidade == 250
         assert entries[0].motivo == "Pagamento promocional validado"
+        custody = database.scalar(select(MovimentoCustodia).where(MovimentoCustodia.comprovante_id == receipt_id))
+        assert custody.custodia_centavos == 25
+        assert custody.reserva_centavos == 1
+
+
+def test_withdrawal_blocks_points_and_distributes_custody_to_few_sellers() -> None:
+    buyer = create_test_user("saque-comprador@teste.com", "comprador")
+    large_custodian = create_test_user("saque-custodia-maior@teste.com", "vendedor")
+    small_custodian = create_test_user("saque-custodia-menor@teste.com", "vendedor")
+    with SessionLocal() as database:
+        database.scalar(select(PerfilComprador).where(PerfilComprador.usuario_id == buyer.id)).chave_pix = "pix-saque@criar"
+        database.add(LancamentoPontos(usuario_id=buyer.id, quantidade=5000, motivo="Saldo testado"))
+        database.add_all([
+            MovimentoCustodia(vendedor_id=large_custodian.id, custodia_centavos=300, reserva_centavos=5, motivo="Custódia teste"),
+            MovimentoCustodia(vendedor_id=small_custodian.id, custodia_centavos=200, reserva_centavos=4, motivo="Custódia teste"),
+        ])
+        database.commit()
+
+    with TestClient(app) as buyer_client:
+        login = buyer_client.get("/login")
+        buyer_client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        points = buyer_client.get("/pontos")
+        withdrawal = buyer_client.post("/pontos/saques", data={"csrf": csrf_from(points), "pontos": "5000"}, follow_redirects=False)
+        assert withdrawal.headers["location"] == "/pontos?saque=1"
+        updated = buyer_client.get(withdrawal.headers["location"])
+        assert "Os pontos já estão bloqueados" in updated.text
+        assert ">0</strong>" in updated.text
+
+    with SessionLocal() as database:
+        redemption = database.scalar(select(SolicitacaoPontos).where(SolicitacaoPontos.usuario_id == buyer.id))
+        obligations = database.scalars(select(ObrigacaoCustodia).where(ObrigacaoCustodia.solicitacao_id == redemption.id).order_by(ObrigacaoCustodia.valor_centavos.desc())).all()
+        assert redemption.pontos == 5000 and redemption.valor_centavos == 500
+        assert [(item.custodiante_id, item.valor_centavos) for item in obligations] == [(large_custodian.id, 300), (small_custodian.id, 200)]
+        first_obligation_id = obligations[0].id
+
+    with TestClient(app) as seller_client:
+        login = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login), "email": large_custodian.email, "senha": "senha-segura"})
+        payable = seller_client.get("/a-pagar")
+        assert "A pagar" in payable.text
+        assert "R$ 3,05" in payable.text
+        assert "pix-saque@criar" in payable.text
+        confirmed = seller_client.post(f"/a-pagar/{first_obligation_id}/confirmar", data={"csrf": csrf_from(payable)}, follow_redirects=False)
+        assert confirmed.headers["location"] == "/a-pagar?pago=1"
+
+
+def test_cart_purchase_with_points_creates_payment_obligations() -> None:
+    buyer = create_test_user("compra-pontos-comprador@teste.com", "comprador")
+    seller = create_test_user("compra-pontos-vendedor@teste.com", "vendedor")
+    custodian = create_test_user("compra-pontos-custodiante@teste.com", "vendedor")
+    with SessionLocal() as database:
+        database.scalar(select(PerfilVendedor).where(PerfilVendedor.usuario_id == seller.id)).chave_pix = "loja-pix@criar"
+        product = Produto(vendedor_id=seller.id, nome="Doce com pontos", descricao="Teste", valor_centavos=100, imagem="pontos.jpg")
+        database.add(product)
+        database.flush()
+        database.add(ItemCarrinho(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, quantidade=1))
+        database.add(LancamentoPontos(usuario_id=buyer.id, quantidade=1000, motivo="Saldo para compra"))
+        database.add(MovimentoCustodia(vendedor_id=custodian.id, custodia_centavos=100, reserva_centavos=0, motivo="Custódia para compra"))
+        database.commit()
+        product_id = product.id
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        cart = client.get("/carrinho")
+        assert "Pagar com pontos" in cart.text
+        response = client.post(f"/carrinho/produtos/{product_id}/finalizar", data={"csrf": csrf_from(cart), "forma_pagamento": "pontos"}, follow_redirects=False)
+        assert response.headers["location"] == "/carrinho?pedido=1"
+
+    with SessionLocal() as database:
+        order = database.scalar(select(Pedido).where(Pedido.cliente_id == buyer.id, Pedido.produto_id == product_id))
+        redemption = database.scalar(select(SolicitacaoPontos).where(SolicitacaoPontos.usuario_id == buyer.id, SolicitacaoPontos.tipo == "compra"))
+        obligation = database.scalar(select(ObrigacaoCustodia).where(ObrigacaoCustodia.solicitacao_id == redemption.id))
+        assert order.pago is True and order.valor_total_centavos == 100
+        assert redemption.pontos == 1000 and redemption.destinatario_id == seller.id
+        assert obligation.custodiante_id == custodian.id and obligation.valor_centavos == 100
 
 
 def test_receipt_queue_processes_only_one_item_at_a_time(monkeypatch) -> None:
