@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from ..database import SessionLocal
 from ..config import settings
-from ..models import DepositoPontos, LancamentoPontos
+from ..models import DepositoPontos, LancamentoPontos, Usuario
 from ..security import csrf_token
 from ..session import current_user
 
@@ -34,3 +34,27 @@ def points_page(request: Request):
         "minimo_reais": settings.min_points_purchase / 1000,
         "maximo_reais": settings.max_points_purchase / 1000,
     })
+
+
+@router.get("/ranking", response_class=HTMLResponse)
+def ranking_page(request: Request):
+    usuario = current_user(request)
+    if not usuario:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    with SessionLocal() as database:
+        balance = func.coalesce(func.sum(LancamentoPontos.quantidade), 0).label("saldo")
+        rows = database.execute(
+            select(Usuario, balance)
+            .outerjoin(LancamentoPontos, LancamentoPontos.usuario_id == Usuario.id)
+            .where(Usuario.ativo.is_(True))
+            .group_by(Usuario.id)
+            .order_by(balance.desc(), Usuario.nome.asc(), Usuario.id.asc())
+        ).all()
+
+    ranking = []
+    for position, (ranked_user, points) in enumerate(rows, 1):
+        first_name = ranked_user.nome.strip().split()[0] if ranked_user.nome.strip() else "Usuário"
+        ranking.append({"posicao": position, "nome": first_name, "foto": ranked_user.foto, "pontos": int(points or 0)})
+
+    return templates.TemplateResponse(request=request, name="ranking.html", context={"usuario": usuario, "csrf_token": csrf_token(request), "ranking": ranking})

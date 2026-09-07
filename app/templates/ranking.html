@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Ranking · Come Doce{% endblock %}
+{% block content %}
+<section class="ranking-page">
+  <header class="points-heading">
+    <span class="eyebrow">Classificação</span>
+    <h1>Ranking de pontos</h1>
+    <p>Os pontos podem ser trocados por dinheiro ou produtos.</p>
+  </header>
+  <div class="ranking-list">
+    {% for pessoa in ranking %}
+      <article class="ranking-item{% if pessoa.posicao <= 3 %} ranking-top-{{ pessoa.posicao }}{% endif %}">
+        <strong class="ranking-position">{{ pessoa.posicao }}º</strong>
+        {% if pessoa.foto %}<img src="/uploads/profile_photos/{{ pessoa.foto }}" alt="Foto de {{ pessoa.nome }}">{% else %}<span class="ranking-photo-placeholder" aria-hidden="true">{{ pessoa.nome[:1] | upper }}</span>{% endif %}
+        <span class="ranking-name">{{ pessoa.nome }}</span>
+        <strong class="ranking-points">{{ pessoa.pontos }} {{ 'ponto' if pessoa.pontos == 1 else 'pontos' }}</strong>
+      </article>
+    {% else %}<p>Nenhum usuário disponível no ranking.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

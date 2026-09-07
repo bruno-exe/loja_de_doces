@@ -1116,6 +1116,32 @@ def test_admin_receipts_and_manual_payment_approval_are_restricted() -> None:
         assert database.get(Pedido, cash_order_id).pago is True
 
 
+def test_points_ranking_orders_balances_and_shows_only_first_name() -> None:
+    leader = create_test_user("ranking-lider@teste.com", "comprador")
+    runner_up = create_test_user("ranking-segundo@teste.com", "vendedor")
+    viewer = create_test_user("ranking-visitante@teste.com", "comprador")
+    with SessionLocal() as database:
+        database.get(Usuario, leader.id).nome = "Ana Sobrenome Privado"
+        database.get(Usuario, runner_up.id).nome = "Carlos Outra Parte"
+        database.add_all([
+            LancamentoPontos(usuario_id=leader.id, quantidade=9000, motivo="Teste ranking"),
+            LancamentoPontos(usuario_id=runner_up.id, quantidade=5000, motivo="Teste ranking"),
+        ])
+        database.commit()
+
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": viewer.email, "senha": "senha-segura"})
+        page = client.get("/ranking")
+        assert page.status_code == 200
+        assert "Os pontos podem ser trocados por dinheiro ou produtos." in page.text
+        assert 'href="/ranking"' in page.text
+        assert page.text.index("Ana") < page.text.index("Carlos")
+        assert "9000 pontos" in page.text and "5000 pontos" in page.text
+        assert "Sobrenome Privado" not in page.text
+        assert "Outra Parte" not in page.text
+
+
 def test_buyer_and_seller_can_exchange_private_messages() -> None:
     seller = create_test_user("mensagem-vendedor@teste.com", "vendedor")
     buyer = create_test_user("mensagem-comprador@teste.com", "comprador")
