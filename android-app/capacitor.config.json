@@ -6,5 +6,10 @@
     "url": "https://comedoce.com.br",
     "cleartext": false,
     "androidScheme": "https"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["sound", "alert", "banner", "list"]
+    }
   }
 }

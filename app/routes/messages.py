@@ -11,6 +11,7 @@ from ..models import Conversa, Mensagem, Usuario
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..timezone_utils import format_brasilia_datetime
+from ..services.push_notifications import queue_message_notification
 
 
 router = APIRouter()
@@ -142,10 +143,14 @@ def send_message(request: Request, conversation_id: int, csrf: str = Form(...), 
     with SessionLocal() as database:
         conversation = _conversation_for_user(database, conversation_id, usuario.id)
         recipient_id = conversation.vendedor_id if conversation.cliente_id == usuario.id else conversation.cliente_id
-        database.add(Mensagem(
+        message = Mensagem(
             conversa_id=conversation.id, remetente_id=usuario.id,
             destinatario_id=recipient_id, texto=texto,
-        ))
+        )
+        database.add(message)
         conversation.atualizada_em = datetime.now(timezone.utc)
         database.commit()
+        database.refresh(message)
+        message_id = message.id
+    queue_message_notification(message_id)
     return RedirectResponse(f"/mensagens/{conversation_id}", status_code=status.HTTP_303_SEE_OTHER)

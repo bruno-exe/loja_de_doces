@@ -4,7 +4,8 @@
   const csrf = document.querySelector('input[name="csrf"]')?.value;
   if (!csrf) return;
   try {
-    await push.createChannel({ id: 'vendas', name: 'Novas vendas', description: 'Avisos de novos pedidos', importance: 5, visibility: 1, sound: 'default', vibration: true });
+    await push.createChannel({ id: 'vendas_som_v2', name: 'Novas vendas', description: 'Avisos sonoros de novos pedidos', importance: 5, visibility: 1, vibration: true });
+    await push.createChannel({ id: 'mensagens_som_v1', name: 'Novas mensagens', description: 'Avisos sonoros de mensagens recebidas', importance: 5, visibility: 1, vibration: true });
     let permission = await push.checkPermissions();
     if (permission.receive === 'prompt') permission = await push.requestPermissions();
     if (permission.receive !== 'granted') return;

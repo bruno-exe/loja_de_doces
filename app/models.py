@@ -143,6 +143,16 @@ class NotificacaoVenda(Base):
     enviada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class NotificacaoMensagem(Base):
+    __tablename__ = "notificacoes_mensagens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mensagem_id: Mapped[int] = mapped_column(ForeignKey("mensagens.id"), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    erro: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enviada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ItemCarrinho(Base):
     __tablename__ = "itens_carrinho"
     __table_args__ = (CheckConstraint("quantidade BETWEEN 1 AND 99", name="ck_itens_carrinho_quantidade"),)
