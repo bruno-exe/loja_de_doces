@@ -1,0 +1,40 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b2b">
+  <title>A Ilha dos Baús — Encontre seu tesouro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html"><span class="brand-icon" aria-hidden="true">✦</span> ILHA DOS BAÚS</a>
+      <span class="edition"><span></span> UMA NOVA AVENTURA</span>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">O SEU TESOURO ESTÁ AQUI</p>
+        <h1>Oito baús.<br>Três <em>descobertas.</em></h1>
+        <p class="subtitle">Siga sua intuição, escolha seus baús<br class="mobile-break"> e descubra o que está guardado para você.</p>
+        <div class="steps" aria-label="Como jogar"><span><b>1</b> Escolha 3 baús</span><i></i><span><b>2</b> Revele os tesouros</span><i></i><span><b>3</b> Surpreenda-se</span></div>
+      </section>
+      <section class="game-panel" aria-label="Jogo dos baús">
+        <div class="board-heading"><div><p class="eyebrow">FAÇA SUAS ESCOLHAS</p><h2 id="boardTitle">Qual deles chama por você?</h2></div><div class="selection-meter"><div class="selection-dots" aria-hidden="true"><span></span><span></span><span></span></div><span id="selectionCount">0 de 3 selecionados</span></div></div>
+        <div id="gameBoard" class="game-board" aria-label="Oito baús para escolher"></div>
+        <div class="action-row"><p id="hint">Você pode trocar suas escolhas antes de abrir.</p><button id="revealBtn" class="primary-btn" disabled>Escolha mais 3 baús <span aria-hidden="true">↗</span></button></div>
+      </section>
+      <section class="result-zone" aria-labelledby="resultTitle">
+        <div class="result-heading"><div><p class="eyebrow">SUAS DESCOBERTAS</p><h2 id="resultTitle">Um lugar para seus tesouros</h2></div><span id="rewardCount" class="reward-count">0 / 3 revelados</span></div>
+        <div id="prizeList" class="prize-list"></div>
+        <div class="result-footer"><p id="resultText" role="status" aria-live="polite">Os prêmios dos seus baús aparecerão aqui.</p><button id="resetBtn" class="secondary-btn" type="button">↻ &nbsp; Recomeçar</button></div>
+      </section>
+    </main>
+    <footer class="footer"><span>✦ &nbsp; CADA ESCOLHA, UMA DESCOBERTA.</span><span>Modo demonstração · Prêmios ilustrativos</span></footer>
+  </div>
+  <div id="confetti" aria-hidden="true"></div>
+  <script src="script.js"></script>
+</body>
+</html>

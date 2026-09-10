@@ -22,7 +22,7 @@ from PIL import Image
 
 from app.database import Base, SessionLocal, engine
 from app.main import app
-from app.models import ComprovantePagamento, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, LancamentoPontos, Mensagem, MovimentoCustodia, ObrigacaoCustodia, PagamentoPedidoMercadoPago, Pedido, PerfilComprador, PerfilVendedor, Produto, SolicitacaoPontos, Usuario, VariacaoProduto, VisitaPerfilVendedor
+from app.models import ComprovantePagamento, ConfiguracaoSorteioBau, Conversa, DepositoPontos, IntegracaoMercadoPagoVendedor, ItemCarrinho, ItemPedido, JogadaBau, LancamentoPontos, Mensagem, MovimentoCustodia, ObrigacaoCustodia, PagamentoPedidoMercadoPago, Pedido, PerfilComprador, PerfilVendedor, Produto, SolicitacaoPontos, Usuario, VariacaoProduto, VisitaPerfilVendedor
 from app.security import hash_password, verify_password
 from app.routes import profile as profile_routes
 from app.routes import products as product_routes
@@ -35,6 +35,7 @@ from app.routes import mercadopago_oauth as oauth_routes
 from app.services.mercadopago_oauth import OAuthTokens, decrypt_token, save_tokens
 from app.services.payment_distribution import calculate_payment_distribution
 from app.routes import order_mercadopago as order_mp_routes
+from app.routes import games as game_routes
 from app.services.mercadopago_order_payment import OrderCheckoutResult
 from app.services.profile_photo import process_profile_photo, process_seller_image
 
@@ -1317,6 +1318,10 @@ def test_buyer_and_seller_can_exchange_private_messages() -> None:
 
 def test_confirmed_point_deposit_credits_once() -> None:
     buyer = create_test_user("deposito-pontos@teste.com", "comprador")
+    with SessionLocal() as database:
+        admin = database.scalar(select(Usuario).where(Usuario.email == "bruno@criar"))
+    if admin is None:
+        admin = create_test_user("bruno@criar", "comprador")
     assert parse_brl("1,00") == 100
     assert parse_brl("10.00") == 1000
     with SessionLocal() as database:
@@ -1340,6 +1345,19 @@ def test_confirmed_point_deposit_credits_once() -> None:
         entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.deposito_id == deposit.id)).all()
         assert len(entries) == 1
         assert entries[0].quantidade == 1000
+        custody = database.scalars(select(MovimentoCustodia).where(MovimentoCustodia.deposito_id == deposit.id)).all()
+        assert len(custody) == 1
+        assert custody[0].vendedor_id == admin.id
+        assert custody[0].custodia_centavos == 100
+        assert custody[0].reserva_centavos == 0
+
+    with TestClient(app) as admin_client:
+        login = admin_client.get("/login")
+        admin_client.post("/login", data={"csrf": csrf_from(login), "email": admin.email, "senha": "senha-segura"})
+        profile = admin_client.get("/perfil")
+        assert 'href="/a-pagar"' in profile.text
+        payable = admin_client.get("/a-pagar")
+        assert payable.status_code == 200
 
 
 def test_formats_database_times_in_brasilia_timezone() -> None:
@@ -1531,3 +1549,44 @@ def test_order_checkout_uses_own_seller_token_and_database_total(monkeypatch) ->
         login = client.get("/login")
         client.post("/login", data={"csrf": csrf_from(login), "email": outsider.email, "senha": "senha-segura"})
         assert client.get(f"/pagamentos/pedidos/{order_id}").status_code == 404
+
+
+def test_chest_game_awards_once_per_day_and_assigns_admin_liquidity(monkeypatch) -> None:
+    buyer = create_test_user("jogo-comprador@teste.com", "comprador")
+    seller = create_test_user("jogo-vendedor@teste.com", "vendedor")
+    with SessionLocal() as database:
+        admin = database.scalar(select(Usuario).where(Usuario.email == "bruno@criar"))
+        config = database.get(ConfiguracaoSorteioBau, 1) or ConfiguracaoSorteioBau(id=1)
+        config.ativo = True
+        config.limite_pontos = 24400
+        config.pontos_sorteados = 0
+        config.total_pontos_distribuidos = 0
+        database.add(config)
+        database.commit()
+
+    values = iter([9, 2])
+    monkeypatch.setattr(game_routes.secrets, "randbelow", lambda _: next(values))
+    monkeypatch.setattr(game_routes.secrets, "choice", lambda items: items[0])
+    with TestClient(app) as client:
+        login = client.get("/login")
+        client.post("/login", data={"csrf": csrf_from(login), "email": buyer.email, "senha": "senha-segura"})
+        page = client.get("/jogos")
+        assert page.status_code == 200 and 'src="/jogos/quadro"' in page.text
+        token = csrf_from(page)
+        first = client.post("/api/jogos/baus/abrir", json={"csrf": token, "chests": [1, 4, 8]})
+        assert first.status_code == 200 and first.json()["total_points"] == 4000
+        repeated = client.post("/api/jogos/baus/abrir", json={"csrf": token, "chests": [2, 3, 5]})
+        assert repeated.status_code == 409 and repeated.json()["total_points"] == 4000
+
+    with SessionLocal() as database:
+        plays = database.scalars(select(JogadaBau).where(JogadaBau.usuario_id == buyer.id)).all()
+        entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.jogada_bau_id == plays[0].id)).all()
+        liquidity = database.scalars(select(MovimentoCustodia).where(MovimentoCustodia.jogada_bau_id == plays[0].id)).all()
+        assert len(plays) == len(entries) == len(liquidity) == 1
+        assert entries[0].quantidade == 4000
+        assert liquidity[0].vendedor_id == admin.id and liquidity[0].custodia_centavos == 400
+
+    with TestClient(app) as seller_client:
+        login = seller_client.get("/login")
+        seller_client.post("/login", data={"csrf": csrf_from(login), "email": seller.email, "senha": "senha-segura"})
+        assert seller_client.get("/jogos", follow_redirects=False).headers["location"] == "/perfil"

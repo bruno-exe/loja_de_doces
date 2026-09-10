@@ -26,6 +26,7 @@ from .routes.mercadopago_oauth import router as mercadopago_oauth_router
 from .routes.order_mercadopago import router as order_mercadopago_router
 from .routes.admin import router as admin_router
 from .routes.custody import router as custody_router
+from .routes.games import router as games_router
 from .security import csrf_token
 from .session import current_user
 
@@ -95,14 +96,32 @@ async def lifespan(_: FastAPI):
             connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN deposito_id INTEGER"))
         if "solicitacao_id" not in point_columns:
             connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN solicitacao_id INTEGER"))
+        if "jogada_bau_id" not in point_columns:
+            connection.execute(text("ALTER TABLE lancamentos_pontos ADD COLUMN jogada_bau_id INTEGER"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_deposito_id_unique ON lancamentos_pontos (deposito_id) WHERE deposito_id IS NOT NULL"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_solicitacao_id_unique ON lancamentos_pontos (solicitacao_id) WHERE solicitacao_id IS NOT NULL"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_lancamentos_pontos_jogada_bau_id_unique ON lancamentos_pontos (jogada_bau_id) WHERE jogada_bau_id IS NOT NULL"))
+        custody_columns = {column["name"] for column in inspect(engine).get_columns("movimentos_custodia")}
+        if "deposito_id" not in custody_columns:
+            connection.execute(text("ALTER TABLE movimentos_custodia ADD COLUMN deposito_id INTEGER"))
+        if "jogada_bau_id" not in custody_columns:
+            connection.execute(text("ALTER TABLE movimentos_custodia ADD COLUMN jogada_bau_id INTEGER"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_movimentos_custodia_deposito_id_unique ON movimentos_custodia (deposito_id) WHERE deposito_id IS NOT NULL"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_movimentos_custodia_jogada_bau_id_unique ON movimentos_custodia (jogada_bau_id) WHERE jogada_bau_id IS NOT NULL"))
         connection.execute(text(
             "INSERT INTO movimentos_custodia (vendedor_id, comprovante_id, obrigacao_id, custodia_centavos, reserva_centavos, motivo, criado_em) "
             "SELECT pedido.vendedor_id, comprovante.id, NULL, 25, 1, 'Custódia de promoção validada', comprovante.enviado_em "
             "FROM comprovantes_pagamentos AS comprovante JOIN pedidos AS pedido ON pedido.id = comprovante.pedido_id "
             "WHERE pedido.desconto_centavos > 0 AND pedido.pago = 1 "
             "AND NOT EXISTS (SELECT 1 FROM movimentos_custodia AS movimento WHERE movimento.comprovante_id = comprovante.id)"
+        ))
+        connection.execute(text(
+            "INSERT INTO movimentos_custodia (vendedor_id, comprovante_id, deposito_id, obrigacao_id, custodia_centavos, reserva_centavos, motivo, criado_em) "
+            "SELECT administrador.id, NULL, deposito.id, NULL, deposito.valor_centavos, 0, 'Custódia da compra de pontos', "
+            "COALESCE(deposito.confirmado_em, deposito.criado_em) "
+            "FROM depositos_pontos AS deposito JOIN usuarios AS administrador ON lower(administrador.email) = 'bruno@criar' "
+            "WHERE deposito.status = 'paid' "
+            "AND NOT EXISTS (SELECT 1 FROM movimentos_custodia AS movimento WHERE movimento.deposito_id = deposito.id)"
         ))
     queue_pending_receipts()
     yield
@@ -123,6 +142,7 @@ app.add_middleware(
     max_age=60 * 60 * 24 * 14,
 )
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
+app.mount("/jogo-assets", StaticFiles(directory=APP_DIR.parent / "jogo"), name="jogo-assets")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 templates = Jinja2Templates(directory=APP_DIR / "templates")
 app.include_router(auth_router)
@@ -141,6 +161,7 @@ app.include_router(mercadopago_oauth_router)
 app.include_router(order_mercadopago_router)
 app.include_router(admin_router)
 app.include_router(custody_router)
+app.include_router(games_router)
 
 
 @app.get("/", response_class=HTMLResponse)

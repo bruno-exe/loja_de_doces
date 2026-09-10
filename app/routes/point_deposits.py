@@ -9,11 +9,12 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
+from ..admin_access import ADMIN_EMAIL
 from ..config import settings
 from ..database import SessionLocal
-from ..models import DepositoPontos, LancamentoPontos, Usuario
+from ..models import DepositoPontos, LancamentoPontos, MovimentoCustodia, Usuario
 from ..security import csrf_token, validate_csrf
 from ..services.mercadopago_points import MercadoPagoPointsProvider, PaymentResult
 from ..session import current_user
@@ -63,6 +64,17 @@ def credit_confirmed_payment(database, payment: PaymentResult):
     existing = database.scalar(select(LancamentoPontos).where(LancamentoPontos.deposito_id == deposit.id))
     if existing is None:
         database.add(LancamentoPontos(usuario_id=deposit.usuario_id, deposito_id=deposit.id, quantidade=deposit.quantidade_pontos, motivo="Compra de pontos pelo Mercado Pago"))
+    custody = database.scalar(select(MovimentoCustodia).where(MovimentoCustodia.deposito_id == deposit.id))
+    if custody is None:
+        admin = database.scalar(select(Usuario).where(func.lower(Usuario.email) == ADMIN_EMAIL))
+        if admin is not None:
+            database.add(MovimentoCustodia(
+                vendedor_id=admin.id,
+                deposito_id=deposit.id,
+                custodia_centavos=deposit.valor_centavos,
+                reserva_centavos=0,
+                motivo="Custódia da compra de pontos",
+            ))
     deposit.status = "paid"
     deposit.confirmado_em = deposit.confirmado_em or datetime.now(timezone.utc)
     return deposit, True

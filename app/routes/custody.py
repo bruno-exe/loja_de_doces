@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 
+from ..admin_access import is_admin
 from ..database import SessionLocal
 from ..models import LancamentoPontos, MovimentoCustodia, ObrigacaoCustodia, PerfilComprador, PerfilVendedor, SolicitacaoPontos, Usuario
 from ..security import csrf_token, validate_csrf
@@ -94,7 +95,7 @@ def payable_page(request: Request):
     seller = current_user(request)
     if not seller:
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    if seller.tipo_conta != "vendedor":
+    if seller.tipo_conta != "vendedor" and not is_admin(seller):
         return RedirectResponse("/perfil", status_code=status.HTTP_303_SEE_OTHER)
     with SessionLocal() as database:
         custody = int(database.scalar(select(func.coalesce(func.sum(MovimentoCustodia.custodia_centavos), 0)).where(MovimentoCustodia.vendedor_id == seller.id)) or 0)

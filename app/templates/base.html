@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Come Doce: um espaço para compradores e vendedores de doces.">
   <title>{% block title %}Come Doce{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260905-order-mp1">
+  <link rel="stylesheet" href="/static/css/style.css?v=20260909-games1">
 </head>
 <body{% if usuario %} class="authenticated-page"{% endif %}>
   <header class="site-header{% if usuario %} authenticated-header{% endif %}">
@@ -47,11 +47,12 @@
         <a href="/mensagens" {% if request.url.path.startswith('/mensagens') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9993;</span> Mensagens</a>
         <a href="/pontos" {% if request.url.path == '/pontos' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#11088;</span> Pontos</a>
         <a href="/ranking" {% if request.url.path == '/ranking' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#127942;</span> Ranking</a>
+        {% if usuario.tipo_conta == 'comprador' %}<a href="/jogos" {% if request.url.path == '/jogos' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#127918;</span> Jogos</a>{% endif %}
         <a id="sideMenuCart" href="/carrinho" {% if request.url.path == '/carrinho' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128722;</span> Carrinho</a>
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/vendas" {% if request.url.path.startswith('/vendas') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128200;</span> Vendas</a>{% endif %}
         {% if usuario.tipo_conta == 'vendedor' %}<a href="/pausar" {% if request.url.path == '/pausar' %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9208;</span> Pausar</a>{% endif %}
-        {% if usuario.tipo_conta == 'vendedor' %}<a href="/a-pagar" {% if request.url.path.startswith('/a-pagar') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128176;</span> A pagar</a>{% endif %}
-        {% if usuario.email|lower == 'bruno@criar' %}<a href="/adm" {% if request.url.path.startswith('/adm') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9881;</span> ADM</a>{% endif %}
+        {% if usuario.tipo_conta == 'vendedor' or usuario.email|lower == 'bruno@criar' %}<a href="/a-pagar" {% if request.url.path.startswith('/a-pagar') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#128176;</span> A pagar</a>{% endif %}
+        {% if usuario.email|lower == 'bruno@criar' %}<a href="/adm" {% if request.url.path.startswith('/adm') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#9881;</span> ADM</a><a href="/jogos/controle" {% if request.url.path.startswith('/jogos/controle') %}class="active" aria-current="page"{% endif %}><span aria-hidden="true">&#127922;</span> Controlar jogos</a>{% endif %}
       </div>
     </nav>
   {% endif %}

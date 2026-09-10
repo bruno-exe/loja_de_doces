@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -211,6 +211,7 @@ class LancamentoPontos(Base):
         ForeignKey("depositos_pontos.id"), unique=True, nullable=True, index=True
     )
     solicitacao_id: Mapped[int | None] = mapped_column(ForeignKey("solicitacoes_pontos.id"), unique=True, nullable=True, index=True)
+    jogada_bau_id: Mapped[int | None] = mapped_column(ForeignKey("jogadas_baus.id"), unique=True, nullable=True, index=True)
     quantidade: Mapped[int] = mapped_column(Integer)
     motivo: Mapped[str] = mapped_column(String(160))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
@@ -255,6 +256,8 @@ class MovimentoCustodia(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     vendedor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
     comprovante_id: Mapped[int | None] = mapped_column(ForeignKey("comprovantes_pagamentos.id"), unique=True, nullable=True, index=True)
+    deposito_id: Mapped[int | None] = mapped_column(ForeignKey("depositos_pontos.id"), unique=True, nullable=True, index=True)
+    jogada_bau_id: Mapped[int | None] = mapped_column(ForeignKey("jogadas_baus.id"), unique=True, nullable=True, index=True)
     obrigacao_id: Mapped[int | None] = mapped_column(ForeignKey("obrigacoes_custodia.id"), unique=True, nullable=True, index=True)
     custodia_centavos: Mapped[int] = mapped_column(Integer, default=0)
     reserva_centavos: Mapped[int] = mapped_column(Integer, default=0)
@@ -279,6 +282,31 @@ class DepositoPontos(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ConfiguracaoSorteioBau(Base):
+    __tablename__ = "configuracoes_sorteio_bau"
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=False)
+    limite_pontos: Mapped[int] = mapped_column(Integer, default=0)
+    pontos_sorteados: Mapped[int] = mapped_column(Integer, default=0)
+    total_pontos_distribuidos: Mapped[int] = mapped_column(Integer, default=0)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class JogadaBau(Base):
+    __tablename__ = "jogadas_baus"
+    __table_args__ = (UniqueConstraint("usuario_id", "data_jogo", name="uq_jogadas_baus_usuario_data"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    data_jogo: Mapped[date] = mapped_column(Date, index=True)
+    baus_escolhidos: Mapped[str] = mapped_column(String(40))
+    bau_premiado: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    premio_pontos: Mapped[int] = mapped_column(Integer, default=0)
+    modo_especial: Mapped[bool] = mapped_column(Boolean, default=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class IntegracaoMercadoPagoVendedor(Base):
