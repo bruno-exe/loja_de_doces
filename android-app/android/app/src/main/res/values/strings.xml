@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Come Doce</string>
+    <string name="title_activity_main">Come Doce</string>
+    <string name="package_name">br.com.comedoce.app</string>
+    <string name="custom_url_scheme">br.com.comedoce.app</string>
+</resources>

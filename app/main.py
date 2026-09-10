@@ -27,6 +27,7 @@ from .routes.order_mercadopago import router as order_mercadopago_router
 from .routes.admin import router as admin_router
 from .routes.custody import router as custody_router
 from .routes.games import router as games_router
+from .routes.push_notifications import router as push_notifications_router
 from .security import csrf_token
 from .session import current_user
 
@@ -162,6 +163,7 @@ app.include_router(order_mercadopago_router)
 app.include_router(admin_router)
 app.include_router(custody_router)
 app.include_router(games_router)
+app.include_router(push_notifications_router)
 
 
 @app.get("/", response_class=HTMLResponse)

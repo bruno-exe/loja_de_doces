@@ -29,6 +29,7 @@ class Settings:
         self.mercadopago_client_secret = os.getenv("MERCADOPAGO_CLIENT_SECRET", "")
         self.mercadopago_redirect_uri = os.getenv("MERCADOPAGO_REDIRECT_URI", "")
         self.oauth_token_encryption_key = os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY", "")
+        self.firebase_credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
 
 
 settings = Settings()

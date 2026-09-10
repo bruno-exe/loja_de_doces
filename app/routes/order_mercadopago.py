@@ -17,6 +17,7 @@ from ..services.mercadopago_oauth import MercadoPagoOAuthError, get_seller_merca
 from ..services.mercadopago_order_payment import MercadoPagoOrderPaymentProvider
 from ..services.mercadopago_points import PaymentResult
 from ..services.payment_distribution import calculate_payment_distribution
+from ..services.push_notifications import queue_sale_notification
 from ..session import current_user
 from .point_deposits import valid_signature
 
@@ -150,6 +151,8 @@ def payment_return(request: Request, state: str):
                     if token:
                         paid = reconcile_order_payment(database, record, provider.get_payment(token, payment_id))
                         database.commit()
+                        if paid:
+                            queue_sale_notification(record.pedido_id)
         except Exception:
             paid = False
     title = "Pagamento aprovado" if paid else ("Pagamento não concluído" if state == "falha" else "Pagamento em análise")
@@ -188,8 +191,10 @@ async def order_payment_webhook(request: Request):
             token = get_seller_mercadopago_credentials(database, record.vendedor_id)
             if not token:
                 raise MercadoPagoOAuthError("Token indisponível.")
-            reconcile_order_payment(database, record, provider.get_payment(token, payment_id))
+            paid = reconcile_order_payment(database, record, provider.get_payment(token, payment_id))
             database.commit()
+            if paid:
+                queue_sale_notification(record.pedido_id)
         except Exception:
             return JSONResponse({"success": False}, status_code=502)
     return {"success": True}

@@ -11,6 +11,7 @@ from ..database import SessionLocal
 from ..models import ItemCarrinho, ItemPedido, Pedido, Produto, Usuario, VariacaoProduto
 from ..security import csrf_token, validate_csrf
 from ..services.profile_photo import ProfilePhotoError, process_seller_image
+from ..services.push_notifications import queue_sale_notification
 from ..session import current_user
 
 
@@ -330,6 +331,8 @@ async def buy_product(
         database.refresh(order)
         order_id = order.id
 
+    if pagar_depois:
+        queue_sale_notification(order_id)
     destination = f"/vendedores/{seller_id}?pedido=1" if pagar_depois else f"/pagamentos/pedidos/{order_id}"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 

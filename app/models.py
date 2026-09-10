@@ -121,6 +121,27 @@ class ItemPedido(Base):
     pedido: Mapped[Pedido] = relationship(back_populates="itens")
 
 
+class DispositivoNotificacao(Base):
+    __tablename__ = "dispositivos_notificacao"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    token: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    plataforma: Mapped[str] = mapped_column(String(20), default="android")
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class NotificacaoVenda(Base):
+    __tablename__ = "notificacoes_vendas"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pedido_id: Mapped[int] = mapped_column(ForeignKey("pedidos.id"), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)
+    erro: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enviada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ItemCarrinho(Base):
     __tablename__ = "itens_carrinho"
     __table_args__ = (CheckConstraint("quantidade BETWEEN 1 AND 99", name="ck_itens_carrinho_quantidade"),)

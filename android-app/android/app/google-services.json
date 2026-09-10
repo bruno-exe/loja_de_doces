@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "654604450120",
+    "project_id": "come-doce",
+    "storage_bucket": "come-doce.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:654604450120:android:8d0ca695a72ec46d745b7d",
+        "android_client_info": {
+          "package_name": "br.com.comedoce.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzpJPQa0X--h0Ea34z_G9nzeA0xTRmBtI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

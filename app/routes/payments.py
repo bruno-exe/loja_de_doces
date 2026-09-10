@@ -21,6 +21,7 @@ from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
 from ..services.pix_receipt_ocr import PixReceiptOcrError, extract_pix_receipt
+from ..services.push_notifications import queue_sale_notification
 from .products import format_price
 
 
@@ -256,6 +257,7 @@ async def upload_payment_receipt(request: Request, order_id: int, comprovante: U
         destination.unlink(missing_ok=True)
         raise
     queue_receipt_ocr(receipt_id)
+    queue_sale_notification(order_id)
     return RedirectResponse(f"/pagamentos/pedidos/{order_id}?comprovante=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -301,6 +303,7 @@ def manually_approve_payment(request: Request, order_id: int, csrf: str = Form(.
         order.pago = True
         order.confirmado = True
         database.commit()
+    queue_sale_notification(order_id)
     destination = f"/adm?aprovado=1" if is_admin(user) and user.id != order.vendedor_id else f"/vendas/clientes/{order.cliente_id}?pago=1"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 

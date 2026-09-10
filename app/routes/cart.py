@@ -9,6 +9,7 @@ from ..database import SessionLocal
 from ..models import ItemCarrinho, ItemPedido, Pedido, PerfilVendedor, Produto, Usuario, VariacaoProduto
 from ..security import csrf_token, validate_csrf
 from ..session import current_user
+from ..services.push_notifications import queue_sale_notification
 from .products import format_price
 from .custody import POINTS_PER_CENT, REDEMPTION_LOCK, RedemptionError, create_points_redemption
 
@@ -133,6 +134,8 @@ def finish_cart_product(request: Request, product_id: int, forma_pagamento: str 
         database.refresh(order)
         order_id = order.id
         seller_id = product.vendedor_id
+    if forma_pagamento in {"depois", "pontos"}:
+        queue_sale_notification(order_id)
     destination = f"/pagamentos/pedidos/{order_id}" if forma_pagamento == "agora" else "/carrinho?pedido=1"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
@@ -166,6 +169,7 @@ def change_pending_order_to_pay_later(request: Request, order_id: int, csrf: str
         for item in cart_items:
             database.delete(item)
         database.commit()
+    queue_sale_notification(order_id)
     return RedirectResponse("/carrinho?pedido=1", status_code=status.HTTP_303_SEE_OTHER)
 
 

@@ -1,0 +1,10 @@
+{
+  "appId": "br.com.comedoce.app",
+  "appName": "Come Doce",
+  "webDir": "www",
+  "server": {
+    "url": "https://comedoce.com.br",
+    "cleartext": false,
+    "androidScheme": "https"
+  }
+}
