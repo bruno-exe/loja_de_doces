@@ -42,6 +42,12 @@ def _play_payload(play: JogadaBau | None):
     return {"played": True, "remaining_chests": 0, "prizes": prizes, "total_points": play.premio_pontos}
 
 
+def _randomize_prize(base_points: int) -> int:
+    """Reduz o prêmio entre 5,59% e 12,60%, usando somente aritmética inteira."""
+    discount_basis_points = 559 + secrets.randbelow(702)
+    return max(1, base_points * (10_000 - discount_basis_points) // 10_000)
+
+
 @router.get("/jogos", response_class=HTMLResponse)
 def games_page(request: Request):
     user = current_user(request)
@@ -92,12 +98,13 @@ async def open_chests(request: Request):
         special = config.ativo and config.pontos_sorteados < config.limite_pontos
         if special:
             intended = 1000 if secrets.randbelow(10) < 7 else (secrets.randbelow(3) + 2) * 1000
-            prize = min(intended, config.limite_pontos - config.pontos_sorteados)
+            prize = min(_randomize_prize(intended), config.limite_pontos - config.pontos_sorteados)
             config.pontos_sorteados += prize
             if config.pontos_sorteados >= config.limite_pontos:
                 config.ativo = False
         else:
-            prize = secrets.randbelow(4) + 1 if secrets.randbelow(10) == 0 else 0
+            base_prize = secrets.randbelow(4) + 1 if secrets.randbelow(10) == 0 else 0
+            prize = _randomize_prize(base_prize) if base_prize else 0
         winning_chest = secrets.choice(chosen) if prize else None
         play = JogadaBau(usuario_id=user.id, data_jogo=_today(), baus_escolhidos=",".join(map(str, chosen)), bau_premiado=winning_chest, premio_pontos=prize, modo_especial=special)
         database.add(play)

@@ -1564,7 +1564,7 @@ def test_chest_game_awards_once_per_day_and_assigns_admin_liquidity(monkeypatch)
         database.add(config)
         database.commit()
 
-    values = iter([9, 2])
+    values = iter([9, 2, 0])
     monkeypatch.setattr(game_routes.secrets, "randbelow", lambda _: next(values))
     monkeypatch.setattr(game_routes.secrets, "choice", lambda items: items[0])
     with TestClient(app) as client:
@@ -1574,17 +1574,17 @@ def test_chest_game_awards_once_per_day_and_assigns_admin_liquidity(monkeypatch)
         assert page.status_code == 200 and 'src="/jogos/quadro"' in page.text
         token = csrf_from(page)
         first = client.post("/api/jogos/baus/abrir", json={"csrf": token, "chests": [1, 4, 8]})
-        assert first.status_code == 200 and first.json()["total_points"] == 4000
+        assert first.status_code == 200 and first.json()["total_points"] == 3776
         repeated = client.post("/api/jogos/baus/abrir", json={"csrf": token, "chests": [2, 3, 5]})
-        assert repeated.status_code == 409 and repeated.json()["total_points"] == 4000
+        assert repeated.status_code == 409 and repeated.json()["total_points"] == 3776
 
     with SessionLocal() as database:
         plays = database.scalars(select(JogadaBau).where(JogadaBau.usuario_id == buyer.id)).all()
         entries = database.scalars(select(LancamentoPontos).where(LancamentoPontos.jogada_bau_id == plays[0].id)).all()
         liquidity = database.scalars(select(MovimentoCustodia).where(MovimentoCustodia.jogada_bau_id == plays[0].id)).all()
         assert len(plays) == len(entries) == len(liquidity) == 1
-        assert entries[0].quantidade == 4000
-        assert liquidity[0].vendedor_id == admin.id and liquidity[0].custodia_centavos == 400
+        assert entries[0].quantidade == 3776
+        assert liquidity[0].vendedor_id == admin.id and liquidity[0].custodia_centavos == 377
 
     with TestClient(app) as seller_client:
         login = seller_client.get("/login")
