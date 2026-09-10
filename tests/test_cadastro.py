@@ -17,7 +17,7 @@ if TEST_DATABASE.exists():
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DATABASE.as_posix()}"
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from PIL import Image
 
 from app.database import Base, SessionLocal, engine
@@ -182,6 +182,7 @@ def test_rejects_duplicate_email_and_invalid_csrf() -> None:
         }
         assert client.post("/cadastro", data=data, follow_redirects=False).status_code == 303
         data["csrf"] = csrf_from(client.get("/cadastro"))
+        data["email"] = "ANA@TESTE.COM"
         duplicate = client.post("/cadastro", data=data)
         invalid_csrf = client.post("/cadastro", data={**data, "csrf": "invalido"})
     assert duplicate.status_code == 422
@@ -1254,6 +1255,38 @@ def test_points_ranking_orders_balances_and_shows_only_first_name() -> None:
         assert "9000 pontos" in page.text and "5000 pontos" in page.text
         assert "Sobrenome Privado" not in page.text
         assert "Outra Parte" not in page.text
+
+
+def test_only_admin_can_ban_user_from_ranking_and_zero_balance() -> None:
+    target = create_test_user("ranking-banir@teste.com", "comprador")
+    outsider = create_test_user("ranking-sem-permissao@teste.com", "comprador")
+    with SessionLocal() as database:
+        admin = database.scalar(select(Usuario).where(Usuario.email == "bruno@criar"))
+        database.add(LancamentoPontos(usuario_id=target.id, quantidade=4321, motivo="Saldo antes do banimento"))
+        database.commit()
+
+    with TestClient(app) as outsider_client:
+        login = outsider_client.get("/login")
+        outsider_client.post("/login", data={"csrf": csrf_from(login), "email": outsider.email, "senha": "senha-segura"})
+        ranking = outsider_client.get("/ranking")
+        assert ">Banir</button>" not in ranking.text
+        assert outsider_client.post(f"/ranking/usuarios/{target.id}/banir", data={"csrf": csrf_from(ranking)}).status_code == 404
+
+    with TestClient(app) as admin_client:
+        login = admin_client.get("/login")
+        admin_client.post("/login", data={"csrf": csrf_from(login), "email": admin.email, "senha": "senha-segura"})
+        ranking = admin_client.get("/ranking")
+        assert f'action="/ranking/usuarios/{target.id}/banir"' in ranking.text
+        response = admin_client.post(f"/ranking/usuarios/{target.id}/banir", data={"csrf": csrf_from(ranking)}, follow_redirects=False)
+        assert response.status_code == 303 and response.headers["location"] == "/ranking?banido=1"
+        updated = admin_client.get("/ranking")
+        assert "Usuário banido" in updated.text and "4321 pontos" not in updated.text
+
+    with SessionLocal() as database:
+        banned = database.get(Usuario, target.id)
+        balance = database.scalar(select(func.coalesce(func.sum(LancamentoPontos.quantidade), 0)).where(LancamentoPontos.usuario_id == target.id))
+        assert banned.banido is True and banned.ativo is False and banned.foto is None
+        assert banned.nome == "Usuário banido" and balance == 0
 
 
 def test_buyer_and_seller_can_exchange_private_messages() -> None:

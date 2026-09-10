@@ -5,7 +5,7 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from ..database import SessionLocal
@@ -116,7 +116,7 @@ def register(
         return render_registration(request, form=safe_form, errors=errors, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
     with SessionLocal() as database:
-        if database.scalar(select(Usuario.id).where(Usuario.email == email)):
+        if database.scalar(select(Usuario.id).where(func.lower(Usuario.email) == email)):
             return render_registration(
                 request,
                 form=safe_form,

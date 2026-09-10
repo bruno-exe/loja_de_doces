@@ -44,6 +44,9 @@ async def lifespan(_: FastAPI):
     if "foto" not in user_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE usuarios ADD COLUMN foto VARCHAR(255)"))
+    if "banido" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE usuarios ADD COLUMN banido BOOLEAN NOT NULL DEFAULT 0"))
     seller_profile_columns = {column["name"] for column in inspect(engine).get_columns("perfis_vendedores")}
     buyer_profile_columns = {column["name"] for column in inspect(engine).get_columns("perfis_compradores")}
     if "chave_pix" not in buyer_profile_columns:

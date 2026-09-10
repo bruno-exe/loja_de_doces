@@ -965,6 +965,11 @@ h1 {
 .ranking-top-1 { border-color: #e0b94e; background: #fffaf0; }
 .ranking-top-2 { border-color: #c6cbd1; }
 .ranking-top-3 { border-color: #c98b5c; }
+.ranking-item-admin { grid-template-columns:44px 52px minmax(0,1fr) auto auto; }
+.ranking-ban-button { padding:7px 11px; color:#8a201d; border:1px solid #e4aaa6; border-radius:9px; background:#fff1f0; font-weight:800; cursor:pointer; }
+.ranking-ban-button:hover { background:#ffe3e1; }
+.ranking-banned { opacity:.72; }
+.ranking-banned-photo { color:#6c4436!important; background:#fff!important; border:1px solid var(--line); font-family:inherit!important; font-size:.55rem!important; line-height:1.05; text-align:center; text-transform:uppercase; }
 .custody-summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .custody-summary article,.payable-list > article { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: white; }
 .custody-summary article { display: grid; gap: 4px; }
@@ -981,6 +986,9 @@ h1 {
   .points-deposit-form { grid-template-columns: 1fr; }
   .ranking-page { width: calc(100% - 28px); padding: 40px 0 58px; }
   .ranking-item { grid-template-columns: 36px 46px minmax(0,1fr); padding: 10px; gap: 9px; }
+  .ranking-item-admin { grid-template-columns:36px 46px minmax(0,1fr) auto; }
+  .ranking-item-admin .ranking-points { grid-column:3; }
+  .ranking-item-admin form { grid-column:4; grid-row:1 / span 2; }
   .ranking-item img,.ranking-photo-placeholder { width: 46px; height: 46px; }
   .ranking-points { grid-column: 3; font-size: .82rem; }
   .custody-summary { grid-template-columns: 1fr; }

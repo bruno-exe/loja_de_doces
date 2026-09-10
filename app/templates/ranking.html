@@ -7,13 +7,16 @@
     <h1>Ranking de pontos</h1>
     <p>Os pontos podem ser trocados por dinheiro ou produtos.</p>
   </header>
+  {% if request.query_params.get('banido') %}<div class="product-created-success">Usuário banido, foto removida e saldo zerado.</div>{% endif %}
+  {% if request.query_params.get('erro') == 'proprio' %}<div class="form-errors">A conta administrativa não pode banir a si mesma.</div>{% endif %}
   <div class="ranking-list">
     {% for pessoa in ranking %}
-      <article class="ranking-item{% if pessoa.posicao <= 3 %} ranking-top-{{ pessoa.posicao }}{% endif %}">
+      <article class="ranking-item{% if administrador %} ranking-item-admin{% endif %}{% if pessoa.posicao <= 3 and not pessoa.banido %} ranking-top-{{ pessoa.posicao }}{% endif %}{% if pessoa.banido %} ranking-banned{% endif %}">
         <strong class="ranking-position">{{ pessoa.posicao }}º</strong>
-        {% if pessoa.foto %}<img src="/uploads/profile_photos/{{ pessoa.foto }}" alt="Foto de {{ pessoa.nome }}">{% else %}<span class="ranking-photo-placeholder" aria-hidden="true">{{ pessoa.nome[:1] | upper }}</span>{% endif %}
+        {% if pessoa.banido %}<span class="ranking-photo-placeholder ranking-banned-photo">Usuário<br>banido</span>{% elif pessoa.foto %}<img src="/uploads/profile_photos/{{ pessoa.foto }}" alt="Foto de {{ pessoa.nome }}">{% else %}<span class="ranking-photo-placeholder" aria-hidden="true">{{ pessoa.nome[:1] | upper }}</span>{% endif %}
         <span class="ranking-name">{{ pessoa.nome }}</span>
         <strong class="ranking-points">{{ pessoa.pontos }} {{ 'ponto' if pessoa.pontos == 1 else 'pontos' }}</strong>
+        {% if administrador and not pessoa.banido and pessoa.id != usuario.id %}<form method="post" action="/ranking/usuarios/{{ pessoa.id }}/banir" onsubmit="return confirm('Banir este usuário, remover a foto e zerar seus pontos?');"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="ranking-ban-button" type="submit">Banir</button></form>{% endif %}
       </article>
     {% else %}<p>Nenhum usuário disponível no ranking.</p>{% endfor %}
   </div>

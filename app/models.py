@@ -19,6 +19,7 @@ class Usuario(Base):
     tipo_conta: Mapped[str] = mapped_column(String(20), index=True)
     foto: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    banido: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     perfil_comprador: Mapped["PerfilComprador | None"] = relationship(
