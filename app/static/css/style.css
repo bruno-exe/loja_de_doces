@@ -446,6 +446,9 @@ h1 {
 .buyer-badge { color: #315a3d; background: #dff2e4; }
 .seller-badge { color: #7d321e; background: #ffe0e3; }
 .profile-panel { padding: clamp(24px, 5vw, 42px); border: 1px solid var(--line); border-radius: 30px; background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow); }
+.seller-app-download { margin-top:16px; padding:16px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px; border:1px solid var(--line); border-radius:16px; background:var(--cream); }
+.seller-app-download strong,.seller-app-download span { display:block; }
+.seller-app-download span { margin-top:3px; color:var(--chocolate-soft); font-size:.88rem; }
 .panel-heading { margin-bottom: 25px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .panel-heading h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(1.8rem, 4vw, 2.7rem); }
 .coming-soon { flex: 0 0 auto; color: #8b4c19; background: #ffead6; }
@@ -852,6 +855,8 @@ h1 {
   .profile-avatar { width: 70px; height: 70px; flex-basis: 70px; border-radius: 22px; font-size: 2rem; }
   .profile-heading h1 { font-size: 2.1rem; }
   .profile-panel { padding: 24px 18px; border-radius: 24px; }
+  .seller-app-download { align-items:stretch; flex-direction:column; }
+  .seller-app-download .button { text-align:center; }
   .panel-heading { flex-direction: column; }
   .summary-grid { grid-template-columns: 1fr; }
   .account-edit-page { width: min(100% - 28px, 980px); padding: 36px 0 56px; }

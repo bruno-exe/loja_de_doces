@@ -259,6 +259,8 @@ def test_seller_receives_seller_profile() -> None:
     assert "Criar produto" in profile.text
     assert "0 produtos cadastrados" in profile.text
     assert 'href="/produtos/novo">Ver</a>' in profile.text
+    assert 'href="https://comedoce.com.br/static/downloads/comedoce.apk"' in profile.text
+    assert "Baixar APK" in profile.text
 
 
 def test_inactive_user_cannot_log_in() -> None:
