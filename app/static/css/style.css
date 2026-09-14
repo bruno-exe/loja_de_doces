@@ -802,6 +802,16 @@ h1 {
 .sales-history-card { padding: 12px; display: grid; grid-template-columns: 72px minmax(0,1fr) auto; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 18px; background: white; }
 .sales-history-card img,.sales-history-card > .purchased-product-placeholder { width: 72px; height: 72px; border-radius: 13px; object-fit: cover; }
 .sales-history-card > div { display: grid; gap: 4px; }
+.sales-history-card > .sale-order-controls { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px 16px; padding-top: 12px; border-top: 1px solid var(--line); align-items: start; }
+.sale-payment-actions { display: grid; gap: 8px; justify-items: start; }
+.sale-order-controls form { margin: 0; }
+.sale-order-controls .button { width: 100%; max-width: 210px; min-height: 38px; padding: 8px 10px; font-size: .8rem; }
+.sale-payment-actions > a,.sale-payment-actions > form { width: 100%; max-width: 210px; }
+.sale-control-status { display: grid; gap: 4px; justify-items: end; text-align: right; min-width: 0; }
+.sale-control-status .payment-status { white-space: normal; }
+.sale-order-controls .button:disabled { opacity: .5; cursor: not-allowed; }
+.sale-control-status .is-cancelled { background: #fde9e9; color: #a12c2c; }
+.sale-refund-note { grid-column: 1 / -1; }
 .sales-history-card strong { font-family: Georgia,serif; font-size: 1.05rem; }
 .sales-history-card span:not(.payment-status),.sales-history-card small { color: var(--chocolate-soft); font-size: .8rem; }
 

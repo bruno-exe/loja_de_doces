@@ -61,6 +61,8 @@ async def lifespan(_: FastAPI):
             connection.execute(text("ALTER TABLE perfis_vendedores ADD COLUMN nome_recebedor_pix VARCHAR(140)"))
     order_columns = {column["name"] for column in inspect(engine).get_columns("pedidos")}
     with engine.begin() as connection:
+        if "entregue" not in order_columns:
+            connection.execute(text("ALTER TABLE pedidos ADD COLUMN entregue BOOLEAN NOT NULL DEFAULT 0"))
         if "produto_descricao" not in order_columns:
             connection.execute(text("ALTER TABLE pedidos ADD COLUMN produto_descricao TEXT"))
         if "produto_imagem" not in order_columns:

@@ -103,6 +103,7 @@ class Pedido(Base):
     entregar_aqui: Mapped[bool] = mapped_column(Boolean, default=False)
     pago: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="recebido")
+    entregue: Mapped[bool] = mapped_column(Boolean, default=False)
     confirmado: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     itens: Mapped[list["ItemPedido"]] = relationship(

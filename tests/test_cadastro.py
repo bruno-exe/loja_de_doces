@@ -750,6 +750,77 @@ def test_customer_buys_product_from_storefront() -> None:
         assert forbidden.status_code == 403
 
 
+def test_seller_can_deliver_and_cancel_only_own_sales() -> None:
+    seller = create_test_user("controle-vendedor@teste.com", "vendedor")
+    outsider = create_test_user("controle-outro@teste.com", "vendedor")
+    buyer = create_test_user("controle-comprador@teste.com", "comprador")
+    with SessionLocal() as database:
+        product = Produto(vendedor_id=seller.id, nome="Bombom controle", descricao="Teste controle", valor_centavos=500, imagem="controle.webp")
+        database.add(product)
+        database.flush()
+        order = Pedido(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, produto_nome="Bombom controle", quantidade=2, valor_unitario_centavos=500, valor_total_centavos=1000, pago=True, confirmado=True)
+        database.add(order)
+        database.commit()
+        order_id = order.id
+    with TestClient(app) as client:
+        client.post("/login", data={"csrf": csrf_from(client.get("/login")), "email": seller.email, "senha": "senha-segura"})
+        page = client.get(f"/vendas/clientes/{buyer.id}")
+        csrf = csrf_from(page)
+        assert "Marcar como entregue" in page.text
+        assert "Cancelar venda" in page.text
+        assert "Entrega pendente" in page.text
+        assert client.post(f"/vendas/pedidos/{order_id}/entregar", data={"csrf": "invalido"}).status_code == 403
+        for _ in range(2):
+            assert client.post(f"/vendas/pedidos/{order_id}/entregar", data={"csrf": csrf}, follow_redirects=False).status_code == 303
+        page = client.get(f"/vendas/clientes/{buyer.id}")
+        assert ">Entregue</span>" in page.text
+        for _ in range(2):
+            assert client.post(f"/vendas/pedidos/{order_id}/cancelar", data={"csrf": csrf}, follow_redirects=False).status_code == 303
+        assert client.post(f"/vendas/pedidos/{order_id}/entregar", data={"csrf": csrf}).status_code == 422
+        page = client.get(f"/vendas/clientes/{buyer.id}")
+        assert ">Cancelada</span>" in page.text
+        assert "A devolução deve ser feita por fora do site." in page.text
+        with SessionLocal() as database:
+            order = database.get(Pedido, order_id)
+            assert order.pago and order.entregue and order.status == "cancelado"
+            assert order.valor_total_centavos == 1000
+    with TestClient(app) as client:
+        client.post("/login", data={"csrf": csrf_from(client.get("/login")), "email": outsider.email, "senha": "senha-segura"})
+        csrf = csrf_from(client.get("/perfil"))
+        for action in ["entregar", "cancelar"]:
+            assert client.post(f"/vendas/pedidos/{order_id}/{action}", data={"csrf": csrf}).status_code == 404
+
+
+def test_order_limit_ten_includes_variations_and_cart_accumulation() -> None:
+    seller = create_test_user("limite-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("limite-comprador@teste.com", "comprador")
+    with SessionLocal() as database:
+        product = Produto(vendedor_id=seller.id, nome="Bombom limite", descricao="Teste limite", valor_centavos=500, aceita_fiado=True, imagem="limite.webp")
+        product.variacoes = [VariacaoProduto(nome="Chocolate"), VariacaoProduto(nome="Morango")]
+        plain = Produto(vendedor_id=seller.id, nome="Brigadeiro limite", descricao="Teste limite", valor_centavos=500, aceita_fiado=True, imagem="limite.webp")
+        database.add_all([product, plain])
+        database.commit()
+        product_id, plain_id = product.id, plain.id
+        first, second = [variation.id for variation in product.variacoes]
+    with TestClient(app) as client:
+        client.post("/login", data={"csrf": csrf_from(client.get("/login")), "email": buyer.email, "senha": "senha-segura"})
+        csrf = csrf_from(client.get(f"/vendedores/{seller.id}"))
+        for action in ["comprar", "carrinho"]:
+            assert client.post(f"/produtos/{product_id}/{action}", data={"csrf": csrf, f"variacao_{first}": "6", f"variacao_{second}": "5"}).status_code == 422
+            assert client.post(f"/produtos/{plain_id}/{action}", data={"csrf": csrf, "quantidade": "11"}).status_code == 422
+        assert client.post(f"/produtos/{plain_id}/comprar", data={"csrf": csrf, "quantidade": "10", "pagar_depois": "true"}, follow_redirects=False).status_code == 303
+        assert client.post(f"/produtos/{product_id}/carrinho", data={"csrf": csrf, f"variacao_{first}": "6"}, follow_redirects=False).status_code == 303
+        assert client.post(f"/produtos/{product_id}/carrinho", data={"csrf": csrf, f"variacao_{second}": "5"}).status_code == 422
+        assert client.get("/carrinho/quantidade").json()["quantidade"] == 6
+        assert client.post(f"/produtos/{product_id}/carrinho", data={"csrf": csrf, f"variacao_{second}": "4"}, follow_redirects=False).status_code == 303
+        assert client.post(f"/carrinho/produtos/{product_id}/finalizar", data={"csrf": csrf, "forma_pagamento": "depois"}, follow_redirects=False).status_code == 303
+        with SessionLocal() as database:
+            database.add(ItemCarrinho(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=plain_id, quantidade=11))
+            database.commit()
+        for payment in ["agora", "depois", "pontos"]:
+            assert client.post(f"/carrinho/produtos/{plain_id}/finalizar", data={"csrf": csrf, "forma_pagamento": payment}).status_code == 422
+
+
 def test_customer_selects_multiple_product_variations() -> None:
     seller = create_test_user("sabores-vendedor@teste.com", "vendedor")
     buyer = create_test_user("sabores-comprador@teste.com", "comprador")
@@ -792,11 +863,11 @@ def test_customer_selects_multiple_product_variations() -> None:
         assert "Chocolate" in cart.text
         assert "Morango" in cart.text
         assert "R$ 8,26" in cart.text
-        assert "Inclui R$ 0,26 para receber 250 pontos" in cart.text
-        assert "R$ 4,00 de desconto aplicado." in cart.text
-        assert "Subtotal</dt><dd>R$ 12,00" in cart.text
-        assert "Programa de pontos</dt><dd>+ R$ 0,26" in cart.text
-        assert "Total</dt><dd>R$ 8,26" in cart.text
+        assert "Pontos com essa compra: 250" in cart.text
+        assert "Desconto: R$ 3,74" in cart.text
+        assert "Valor</dt><dd>R$ 12,00" in cart.text
+        assert "R$ 0,26" not in cart.text
+        assert "Total a pagar</dt><dd>R$ 8,26" in cart.text
         assert 'href="/carrinho"' in cart.text
 
         with SessionLocal() as database:

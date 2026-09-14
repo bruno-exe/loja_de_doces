@@ -20,6 +20,13 @@
   const formatMoney = (cents) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 
   const updatePromotion = () => {
+    const inputs = variationOptions.querySelectorAll('input[type="number"]');
+    const count = inputs.length
+      ? Array.from(inputs).reduce((sum, input) => sum + (Number(input.value) || 0), 0)
+      : (Number(quantityInput.value) || 0);
+    const validationInput = inputs.length ? inputs[0] : quantityInput;
+    validationInput.setCustomValidity(count < 1 || count > 10
+      ? "Escolha de 1 a 10 doces por pedido, somando todos os sabores." : "");
     if (!discountQuantity) {
       promotionMessage.hidden = true;
       return;
@@ -39,12 +46,12 @@
       const originalLine = document.createElement("span");
       originalLine.textContent = `Valor: ${formatMoney(originalValue)}`;
       const discountLine = document.createElement("strong");
-      discountLine.textContent = `Desconto de ${formatMoney(appliedDiscount)} aplicado!`;
+      discountLine.textContent = `Desconto: ${formatMoney(appliedDiscount - 26)}`;
       const totalLine = document.createElement("span");
       totalLine.textContent = `Total a pagar: ${formatMoney(originalValue - appliedDiscount + 26)}`;
       promotionMessage.append(originalLine, discountLine, totalLine);
       const pointsLine = document.createElement("small");
-      pointsLine.textContent = "Inclui R$ 0,26 para receber 250 pontos após a validação do comprovante.";
+      pointsLine.textContent = "Pontos com essa compra: 250";
       promotionMessage.append(pointsLine);
       if (missing > 0) {
         const nextDiscount = document.createElement("small");
@@ -94,6 +101,10 @@
     });
   });
   quantityInput.addEventListener("input", updatePromotion);
+  form.addEventListener("submit", (event) => {
+    updatePromotion();
+    if (!form.reportValidity()) event.preventDefault();
+  });
 
   dialog.querySelector(".purchase-dialog-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (event) => {

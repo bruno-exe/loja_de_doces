@@ -3,6 +3,8 @@
 {% block content %}
 <section class="sales-page">
   {% if request.query_params.get('pago') %}<div class="product-created-success" role="status">Pagamento marcado como pago.</div>{% endif %}
+  {% if request.query_params.get('entregar') %}<div class="product-created-success" role="status">Pedido marcado como entregue.</div>{% endif %}
+  {% if request.query_params.get('cancelar') %}<div class="product-created-success" role="status">Venda cancelada. Se já houve pagamento, devolva o valor por fora do site.</div>{% endif %}
   <a class="back-link" href="/vendas">← Voltar para Vendas</a>
   <header class="sales-customer-header">
     {% if cliente.foto %}<img src="/uploads/profile_photos/{{ cliente.foto }}" alt="Foto de {{ cliente.nome }}">{% else %}<span class="sales-customer-placeholder" aria-hidden="true">{{ cliente.nome[:1] | upper }}</span>{% endif %}
@@ -25,7 +27,18 @@
         <article class="sales-history-card">
           {% if pedido.imagem %}<img src="/uploads/products/{{ pedido.imagem }}" alt="{{ pedido.nome }}">{% else %}<span class="purchased-product-placeholder" aria-hidden="true">🧁</span>{% endif %}
           <div><strong>{{ pedido.nome }}</strong><span>{{ pedido.quantidade }} {{ 'unidade' if pedido.quantidade == 1 else 'unidades' }} · {{ pedido.data }}</span>{% if pedido.itens %}<ul class="order-variation-list">{% for item in pedido.itens %}<li>{{ item.nome }}: {{ item.quantidade }}</li>{% endfor %}</ul>{% endif %}<small>{{ pedido.entrega }} · {{ pedido.pagamento }}</small></div>
-          <div class="purchased-product-payment"><span class="payment-status {{ 'is-paid' if pedido.pago else 'is-pending' }}">{{ pedido.situacao }}</span>{% if pedido.comprovante_id %}<a class="button button-small" href="/pagamentos/pedidos/{{ pedido.id }}">Ver comprovante</a>{% else %}<small>Sem comprovante anexado</small>{% endif %}{% if not pedido.pago %}<form method="post" action="/pagamentos/pedidos/{{ pedido.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary button-small" type="submit">Marcar como pago</button></form>{% endif %}</div>
+          <div class="sale-order-controls">
+            <div class="sale-payment-actions">
+              {% if pedido.comprovante_id %}<a class="button button-small" href="/pagamentos/pedidos/{{ pedido.id }}">Ver comprovante</a>{% else %}<small>Sem comprovante anexado</small>{% endif %}
+              {% if not pedido.pago and not pedido.cancelado %}<form method="post" action="/pagamentos/pedidos/{{ pedido.id }}/aprovar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary button-small" type="submit">Marcar como pago</button></form>{% endif %}
+            </div>
+            <div class="sale-control-status"><small>Pagamento</small><span class="payment-status {{ 'is-paid' if pedido.pago else 'is-pending' }}">{{ pedido.situacao }}</span></div>
+            <form method="post" action="/vendas/pedidos/{{ pedido.id }}/entregar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary button-small" type="submit" {% if pedido.entregue or pedido.cancelado %}disabled{% endif %}>Marcar como entregue</button></form>
+            <div class="sale-control-status"><small>Entrega</small><span class="payment-status {{ 'is-paid' if pedido.entregue else 'is-pending' }}">{{ 'Entregue' if pedido.entregue else ('Não realizada' if pedido.cancelado else 'Entrega pendente') }}</span></div>
+            <form method="post" action="/vendas/pedidos/{{ pedido.id }}/cancelar"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button-secondary button-small sale-cancel-button" type="submit" {% if pedido.cancelado %}disabled{% endif %}>Cancelar venda</button></form>
+            <div class="sale-control-status"><small>Venda</small><span class="payment-status {{ 'is-cancelled' if pedido.cancelado else 'is-paid' }}">{{ 'Cancelada' if pedido.cancelado else 'Ativa' }}</span></div>
+            {% if pedido.cancelado and pedido.pago %}<small class="sale-refund-note">Pagamento registrado. A devolução deve ser feita por fora do site.</small>{% endif %}
+          </div>
         </article>
       {% endfor %}
     </div>

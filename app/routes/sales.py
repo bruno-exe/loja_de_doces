@@ -1,14 +1,14 @@
 from collections import Counter
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from ..database import SessionLocal
 from ..models import ComprovantePagamento, ItemPedido, Pedido, Produto, Usuario
-from ..security import csrf_token
+from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
 
@@ -16,6 +16,32 @@ from ..timezone_utils import brasilia_datetime, format_brasilia_datetime
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent.parent / "templates")
 WEEKDAYS = ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo")
+
+
+@router.post("/vendas/pedidos/{order_id}/{action}")
+def update_sale(request: Request, order_id: int, action: str, csrf: str = Form(...)):
+    validate_csrf(request, csrf)
+    seller, redirect = seller_only(request)
+    if redirect:
+        return redirect
+    if action not in {"entregar", "cancelar"}:
+        raise HTTPException(status_code=404, detail="Ação não encontrada.")
+    with SessionLocal() as database:
+        order = database.scalar(select(Pedido).where(
+            Pedido.id == order_id, Pedido.vendedor_id == seller.id, Pedido.confirmado.is_(True),
+        ))
+        if order is None:
+            raise HTTPException(status_code=404, detail="Venda não encontrada.")
+        if action == "entregar":
+            if order.status == "cancelado":
+                raise HTTPException(status_code=422, detail="Uma venda cancelada não pode ser marcada como entregue.")
+            order.entregue = True
+        else:
+            # Preserve payment, receipts and financial history. Refunds are external.
+            order.status = "cancelado"
+        customer_id = order.cliente_id
+        database.commit()
+    return RedirectResponse(f"/vendas/clientes/{customer_id}?{action}=1", status_code=303)
 
 
 def seller_only(request: Request):
@@ -91,7 +117,7 @@ def customer_sales_page(request: Request, customer_id: int):
         with SessionLocal() as database:
             items = database.scalars(select(ItemPedido).where(ItemPedido.pedido_id == order.id).order_by(ItemPedido.id)).all()
             receipt_id = database.scalar(select(ComprovantePagamento.id).where(ComprovantePagamento.pedido_id == order.id))
-        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": format_brasilia_datetime(order.criado_em), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago, "comprovante_id": receipt_id})
+        history.append({"id": order.id, "nome": order.produto_nome, "imagem": order.produto_imagem or (product.imagem if product else None), "quantidade": order.quantidade, "itens": [{"nome": item.variacao_nome, "quantidade": item.quantidade} for item in items], "data": format_brasilia_datetime(order.criado_em), "entrega": "Entregar aqui" if order.entregar_aqui else "Retirada", "pagamento": "Pagar depois" if order.pagar_depois else "Pagamento imediato", "situacao": "Pago" if order.pago else "Pagamento pendente", "pago": order.pago, "comprovante_id": receipt_id, "entregue": order.entregue, "cancelado": order.status == "cancelado"})
 
     def preference(counts: Counter, tie_text: str) -> str:
         top = counts.most_common()

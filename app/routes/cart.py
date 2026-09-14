@@ -11,6 +11,7 @@ from ..security import csrf_token, validate_csrf
 from ..session import current_user
 from ..services.push_notifications import queue_sale_notification
 from .products import format_price
+from ..order_limits import validate_order_quantity
 from .custody import POINTS_PER_CENT, REDEMPTION_LOCK, RedemptionError, create_points_redemption
 
 
@@ -76,11 +77,13 @@ def cart_page(request: Request):
             missing = 0 if remainder == 0 and group["quantidade"] > 0 else threshold - remainder
             promotions.append({"produto": group["produto"], "desconto": format_price(applied_discount) if applied_discount else None, "faltam": missing, "desconto_kit": format_price(discount_value), "quantidade_kit": threshold})
         for group in grouped_products.values():
+            group["subtotal_formatado"] = format_price(group["subtotal"])
             if "desconto_centavos" not in group:
                 group["desconto_centavos"] = 0
                 group["desconto"] = format_price(0)
                 group["total"] = format_price(group["subtotal"])
-    summary = {"subtotal": format_price(subtotal), "desconto": format_price(total_discount), "taxa_pontos": format_price(total_points_charge), "taxa_pontos_centavos": total_points_charge, "total": format_price(subtotal - total_discount + total_points_charge)}
+            group["desconto_exibido"] = format_price(group["desconto_centavos"] - group.get("taxa_pontos_centavos", 0))
+    summary = {"subtotal": format_price(subtotal), "desconto": format_price(total_discount - total_points_charge), "pontos": sum(250 for group in grouped_products.values() if group.get("taxa_pontos_centavos")), "total": format_price(subtotal - total_discount + total_points_charge)}
     return templates.TemplateResponse(request=request, name="carrinho.html", context={"usuario": user, "csrf_token": csrf_token(request), "produtos": list(grouped_products.values()), "promocoes": promotions, "resumo": summary})
 
 
@@ -105,6 +108,7 @@ def finish_cart_product(request: Request, product_id: int, forma_pagamento: str 
         if forma_pagamento == "depois" and not product.aceita_fiado:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este produto não aceita pagamento posterior.")
         total_quantity = sum(item.quantidade for item in cart_items)
+        validate_order_quantity(total_quantity)
         discount = (total_quantity // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
         points_charge = PROMOTIONAL_POINTS_CHARGE_CENTS if discount and forma_pagamento != "pontos" else 0
         total_cents = product.valor_centavos * total_quantity - discount + points_charge
@@ -157,6 +161,7 @@ def change_pending_order_to_pay_later(request: Request, order_id: int, csrf: str
         if row is None or not cart_items:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pagamento pendente não encontrado no carrinho.")
         order, product = row
+        validate_order_quantity(order.quantidade)
         variation_ids = {item.variacao_id for item in cart_items if item.variacao_id is not None}
         variations = database.scalars(select(VariacaoProduto).where(VariacaoProduto.id.in_(variation_ids))).all() if variation_ids else []
         active_variation_ids = {variation.id for variation in variations if variation.ativo}

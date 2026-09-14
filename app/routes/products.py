@@ -13,6 +13,7 @@ from ..security import csrf_token, validate_csrf
 from ..services.profile_photo import ProfilePhotoError, process_seller_image
 from ..services.push_notifications import queue_sale_notification
 from ..session import current_user
+from ..order_limits import MAX_SWEETS_PER_ORDER, validate_order_quantity
 
 
 router = APIRouter()
@@ -287,15 +288,14 @@ async def buy_product(
                     variation_quantity = int(raw_quantity)
                 except ValueError:
                     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
-                if variation_quantity < 0 or variation_quantity > 99:
+                if variation_quantity < 0 or variation_quantity > MAX_SWEETS_PER_ORDER:
                     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
                 if variation_quantity:
                     selected_items.append((variation, variation.nome, variation_quantity))
             quantidade = sum(item[2] for item in selected_items)
         else:
             selected_items.append((None, product.nome, quantidade))
-        if quantidade < 1 or quantidade > 99:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
+        validate_order_quantity(quantidade)
 
         discount_total = (quantidade // product.quantidade_desconto) * product.valor_desconto_centavos if product.quantidade_desconto and product.valor_desconto_centavos else 0
         points_charge = 26 if discount_total else 0
@@ -373,23 +373,26 @@ async def add_product_to_cart(
                     selected_quantity = int(str(submitted_form.get(f"variacao_{variation.id}", "0")).strip() or "0")
                 except ValueError:
                     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
-                if selected_quantity < 0 or selected_quantity > 99:
+                if selected_quantity < 0 or selected_quantity > MAX_SWEETS_PER_ORDER:
                     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Quantidade inválida.")
                 if selected_quantity:
                     selected.append((variation.id, selected_quantity))
         else:
             selected.append((None, quantidade))
         total_quantity = sum(item[1] for item in selected)
-        if total_quantity < 1 or total_quantity > 99:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Escolha pelo menos uma unidade, com limite total de 99.")
+        validate_order_quantity(total_quantity)
+        existing_items = database.scalars(select(ItemCarrinho).where(
+            ItemCarrinho.cliente_id == user.id,
+            ItemCarrinho.produto_id == product.id,
+            ItemCarrinho.pedido_pendente_id.is_(None),
+        )).all()
+        validate_order_quantity(sum(item.quantidade for item in existing_items) + total_quantity)
 
         for variation_id, selected_quantity in selected:
             filters = [ItemCarrinho.cliente_id == user.id, ItemCarrinho.produto_id == product.id, ItemCarrinho.pedido_pendente_id.is_(None)]
             filters.append(ItemCarrinho.variacao_id == variation_id if variation_id is not None else ItemCarrinho.variacao_id.is_(None))
             existing = database.scalar(select(ItemCarrinho).where(*filters))
             if existing:
-                if existing.quantidade + selected_quantity > 99:
-                    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="A quantidade deste item no carrinho ultrapassaria 99.")
                 existing.quantidade += selected_quantity
                 existing.pagar_depois = pagar_depois
                 existing.entregar_aqui = entregar_aqui
