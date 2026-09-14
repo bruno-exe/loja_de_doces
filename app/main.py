@@ -30,6 +30,7 @@ from .routes.games import router as games_router
 from .routes.push_notifications import router as push_notifications_router
 from .security import csrf_token
 from .session import current_user
+from CONVITE.routes import router as convite_router
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -167,6 +168,7 @@ app.include_router(admin_router)
 app.include_router(custody_router)
 app.include_router(games_router)
 app.include_router(push_notifications_router)
+app.include_router(convite_router, prefix="/convite")
 
 
 @app.get("/", response_class=HTMLResponse)
