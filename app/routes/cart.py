@@ -50,7 +50,7 @@ def cart_page(request: Request):
         for item, product, seller, variation in rows:
             group_key = (product.id, item.pedido_pendente_id)
             item_available = product.ativo and (variation is None or variation.ativo)
-            group = grouped_products.setdefault(group_key, {"id": product.id, "pedido_pendente_id": item.pedido_pendente_id, "produto": product.nome, "imagem": product.imagem, "vendedor": seller.nome, "vendedor_id": seller.id, "aceita_fiado": product.aceita_fiado, "disponivel": True, "quantidade": 0, "subtotal": 0, "quantidade_desconto": product.quantidade_desconto, "valor_desconto_centavos": product.valor_desconto_centavos, "itens": []})
+            group = grouped_products.setdefault(group_key, {"id": product.id, "removal_item_id": item.id, "pedido_pendente_id": item.pedido_pendente_id, "produto": product.nome, "imagem": product.imagem, "vendedor": seller.nome, "vendedor_id": seller.id, "aceita_fiado": product.aceita_fiado, "disponivel": True, "quantidade": 0, "subtotal": 0, "quantidade_desconto": product.quantidade_desconto, "valor_desconto_centavos": product.valor_desconto_centavos, "itens": []})
             group["disponivel"] = group["disponivel"] and item_available
             group["itens"].append({"id": item.id, "variacao": variation.nome if variation else None, "quantidade": item.quantidade, "valor_unitario": format_price(product.valor_centavos), "valor_total": format_price(product.valor_centavos * item.quantidade), "entregar_aqui": item.entregar_aqui})
             group["quantidade"] += item.quantidade
@@ -199,3 +199,40 @@ def remove_cart_item(request: Request, item_id: int, csrf: str = Form(...)):
         database.delete(item)
         database.commit()
     return RedirectResponse("/carrinho?removido=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/carrinho/pedidos/{item_id}/remover")
+def remove_cart_order(request: Request, item_id: int, csrf: str = Form(...)):
+    validate_csrf(request, csrf)
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    with SessionLocal() as database:
+        anchor = database.scalar(select(ItemCarrinho).where(
+            ItemCarrinho.id == item_id,
+            ItemCarrinho.cliente_id == user.id,
+        ))
+        if anchor is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado no carrinho.")
+        filters = [
+            ItemCarrinho.cliente_id == user.id,
+            ItemCarrinho.produto_id == anchor.produto_id,
+        ]
+        if anchor.pedido_pendente_id is None:
+            filters.append(ItemCarrinho.pedido_pendente_id.is_(None))
+        else:
+            filters.append(ItemCarrinho.pedido_pendente_id == anchor.pedido_pendente_id)
+        items = database.scalars(select(ItemCarrinho).where(*filters)).all()
+        pending_order_id = anchor.pedido_pendente_id
+        for item in items:
+            database.delete(item)
+        if pending_order_id is not None:
+            pending_order = database.scalar(select(Pedido).where(
+                Pedido.id == pending_order_id,
+                Pedido.cliente_id == user.id,
+                Pedido.confirmado.is_(False),
+            ))
+            if pending_order is not None:
+                database.delete(pending_order)
+        database.commit()
+    return RedirectResponse("/carrinho?pedido_removido=1", status_code=status.HTTP_303_SEE_OTHER)

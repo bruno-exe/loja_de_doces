@@ -79,6 +79,7 @@ def render_new_product(
     *,
     form: dict | None = None,
     errors: list[str] | None = None,
+    edit_product: dict | None = None,
     status_code: int = 200,
 ):
     return templates.TemplateResponse(
@@ -90,6 +91,7 @@ def render_new_product(
             "form": form or {},
             "errors": errors or [],
             "produtos": seller_products(usuario.id),
+            "edit_product": edit_product,
         },
         status_code=status_code,
     )
@@ -103,6 +105,29 @@ def new_product_page(request: Request):
     if usuario.tipo_conta != "vendedor":
         return RedirectResponse("/perfil", status_code=status.HTTP_303_SEE_OTHER)
     return render_new_product(request, usuario)
+
+
+@router.get("/produtos/{product_id}/editar", response_class=HTMLResponse)
+def edit_product_page(request: Request, product_id: int):
+    usuario = current_user(request)
+    if not usuario:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if usuario.tipo_conta != "vendedor":
+        return RedirectResponse("/perfil", status_code=status.HTTP_303_SEE_OTHER)
+    with SessionLocal() as database:
+        product = database.scalar(select(Produto).where(Produto.id == product_id, Produto.vendedor_id == usuario.id))
+        if product is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+        form = {
+            "nome": product.nome, "descricao": product.descricao,
+            "valor": format_price(product.valor_centavos).replace("R$ ", ""),
+            "quantidade_desconto": product.quantidade_desconto or "",
+            "valor_desconto": format_price(product.valor_desconto_centavos).replace("R$ ", "") if product.valor_desconto_centavos else "",
+            "aceita_fiado": product.aceita_fiado, "com_entrega": product.com_entrega,
+            "subcategorias": [variation.nome for variation in product.variacoes if variation.ativo],
+        }
+        edit_data = {"id": product.id, "imagem": product.imagem}
+    return render_new_product(request, usuario, form=form, edit_product=edit_data)
 
 
 @router.post("/produtos/novo", response_class=HTMLResponse)
@@ -225,6 +250,120 @@ async def create_product(
         raise
 
     return RedirectResponse("/produtos/novo?criado=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/produtos/{product_id}/editar", response_class=HTMLResponse)
+async def edit_product(
+    request: Request, product_id: int, nome: str = Form(...), descricao: str = Form(...),
+    valor: str = Form(...), quantidade_desconto: str = Form(""), valor_desconto: str = Form(""),
+    aceita_fiado: bool = Form(False), com_entrega: bool = Form(False),
+    subcategorias: list[str] = Form([]), imagem: UploadFile | None = File(None),
+    focus_x: float | None = Form(None), focus_y: float | None = Form(None), csrf: str = Form(...),
+):
+    validate_csrf(request, csrf)
+    usuario = current_user(request)
+    if not usuario:
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if usuario.tipo_conta != "vendedor":
+        return RedirectResponse("/perfil", status_code=status.HTTP_303_SEE_OTHER)
+
+    nome = " ".join(nome.strip().split())
+    descricao = descricao.strip()
+    price_in_cents = parse_price(valor)
+    discount_quantity = None
+    discount_in_cents = None
+    errors: list[str] = []
+    if len(nome) < 2 or len(nome) > 120:
+        errors.append("O nome do produto deve ter entre 2 e 120 caracteres.")
+    if len(descricao) < 2 or len(descricao) > 1000:
+        errors.append("A descrição deve ter entre 2 e 1000 caracteres.")
+    if price_in_cents is None:
+        errors.append("Informe um valor válido maior que zero, com no máximo duas casas decimais.")
+    if quantidade_desconto.strip() or valor_desconto.strip():
+        try:
+            discount_quantity = int(quantidade_desconto.strip())
+        except ValueError:
+            discount_quantity = None
+        discount_in_cents = parse_price(valor_desconto)
+        if discount_quantity is None or not 2 <= discount_quantity <= 99 or discount_in_cents is None:
+            errors.append("Para criar a promoção, informe uma quantidade entre 2 e 99 e um desconto válido.")
+        elif price_in_cents is not None and discount_in_cents >= price_in_cents * discount_quantity:
+            errors.append("O desconto deve ser menor que o valor total do kit.")
+    if (focus_x is None) != (focus_y is None) or (focus_x is not None and not 0 <= focus_x <= 1) or (focus_y is not None and not 0 <= focus_y <= 1):
+        errors.append("O ponto de foco selecionado é inválido.")
+    variation_names: list[str] = []
+    seen_variations: set[str] = set()
+    for raw_name in subcategorias:
+        variation_name = " ".join(raw_name.strip().split())
+        if not variation_name:
+            continue
+        if len(variation_name) > 120:
+            errors.append("Cada subcategoria deve ter no máximo 120 caracteres.")
+            continue
+        normalized = variation_name.casefold()
+        if normalized not in seen_variations:
+            seen_variations.add(normalized)
+            variation_names.append(variation_name)
+    if len(variation_names) > 20:
+        errors.append("Cadastre no máximo 20 subcategorias por produto.")
+
+    has_new_image = bool(imagem and imagem.filename)
+    image_contents = b""
+    if has_new_image:
+        if imagem.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            errors.append("Use uma imagem JPG, PNG ou WebP.")
+        image_contents = await imagem.read(5 * 1024 * 1024 + 1)
+        if len(image_contents) > 5 * 1024 * 1024:
+            errors.append("A imagem deve ter no máximo 5 MB.")
+    elif focus_x is not None or focus_y is not None:
+        errors.append("Escolha uma nova imagem antes de definir outro foco.")
+    safe_form = {"nome": nome, "descricao": descricao, "valor": valor, "quantidade_desconto": quantidade_desconto, "valor_desconto": valor_desconto, "aceita_fiado": aceita_fiado, "com_entrega": com_entrega, "subcategorias": variation_names}
+
+    with SessionLocal() as database:
+        product = database.scalar(select(Produto).where(Produto.id == product_id, Produto.vendedor_id == usuario.id))
+        if product is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+        edit_data = {"id": product.id, "imagem": product.imagem}
+    if errors:
+        return render_new_product(request, usuario, form=safe_form, errors=errors, edit_product=edit_data, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
+
+    new_filename = None
+    if has_new_image:
+        try:
+            processed_image = process_seller_image(image_contents, focus_x, focus_y)
+        except ProfilePhotoError:
+            return render_new_product(request, usuario, form=safe_form, errors=["Não foi possível processar essa imagem."], edit_product=edit_data, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
+        new_filename = f"{uuid4().hex}.webp"
+        (PRODUCT_PHOTO_DIR / new_filename).write_bytes(processed_image)
+
+    old_filename = None
+    try:
+        with SessionLocal() as database:
+            product = database.scalar(select(Produto).where(Produto.id == product_id, Produto.vendedor_id == usuario.id))
+            if product is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+            product.nome, product.descricao, product.valor_centavos = nome, descricao, price_in_cents
+            product.quantidade_desconto, product.valor_desconto_centavos = discount_quantity, discount_in_cents
+            product.aceita_fiado, product.com_entrega = aceita_fiado, com_entrega
+            if new_filename:
+                old_filename, product.imagem = product.imagem, new_filename
+            existing_by_name = {variation.nome.casefold(): variation for variation in product.variacoes}
+            for variation in product.variacoes:
+                variation.ativo = False
+            for variation_name in variation_names:
+                variation = existing_by_name.get(variation_name.casefold())
+                if variation:
+                    variation.nome, variation.ativo = variation_name, True
+                else:
+                    product.variacoes.append(VariacaoProduto(nome=variation_name, ativo=True))
+            database.commit()
+    except Exception:
+        if new_filename:
+            (PRODUCT_PHOTO_DIR / new_filename).unlink(missing_ok=True)
+        raise
+    if old_filename:
+        (PRODUCT_PHOTO_DIR / Path(old_filename).name).unlink(missing_ok=True)
+    return RedirectResponse(f"/produtos/{product_id}/editar?atualizado=1", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/produtos/{product_id}/excluir")

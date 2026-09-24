@@ -558,6 +558,8 @@ h1 {
 .new-product-heading h1 { margin-bottom: 12px; font-size: clamp(2.6rem,7vw,5rem); }
 .new-product-heading p { color: var(--chocolate-soft); }
 .product-created-success { margin-bottom: 20px; padding: 16px 18px; color: #285f38; border: 1px solid #acd6b7; border-radius: 14px; background: #edf9f0; }
+.edit-product-link { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; margin: 10px 10px 0; padding: 7px 14px; border: 1px solid #dba87e; border-radius: 11px; color: #8d430d; background: #fff8f1; font-size: .84rem; font-weight: 850; text-decoration: none; }
+.current-product-image { display: block; width: min(100%,220px); aspect-ratio: 1; margin: 0 auto 14px; border-radius: 16px; object-fit: cover; }
 .new-product-form { padding: clamp(22px,5vw,40px); display: grid; grid-template-columns: minmax(0,1fr) minmax(320px,.9fr); gap: 28px; border: 1px solid var(--line); border-radius: 30px; background: rgba(255,255,255,.94); box-shadow: var(--shadow); }
 .product-form-fields { display: grid; align-content: start; gap: 17px; }
 .product-form-fields textarea { width: 100%; min-height: 130px; padding: 12px 14px; color: var(--chocolate); border: 1px solid #d8c5b8; border-radius: 13px; background: white; font: inherit; line-height: 1.5; resize: vertical; }
@@ -638,6 +640,9 @@ h1 {
 .cart-item-actions > strong { color: #a94f0c; white-space: nowrap; }
 .cart-item-actions form { margin: 0; }
 .cart-item-actions button { padding: 0; color: #a02d24; border: 0; background: transparent; font: inherit; font-size: .78rem; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.cart-remove-order { grid-column: 1 / -1; margin: 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.cart-remove-order button { width: 100%; min-height: 42px; padding: 9px 14px; border: 1px solid #dca39e; border-radius: 12px; color: #a02d24; background: #fff8f7; font: inherit; font-size: .84rem; font-weight: 850; cursor: pointer; }
+.cart-remove-order button:hover { background: #fdeceb; }
 .cart-variation-items { margin: 6px 0 0; padding: 0; display: grid; gap: 5px; list-style: none; }
 .cart-variation-items li { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 12px; color: var(--chocolate-soft); font-size: .82rem; }
 .cart-variation-items form { margin: 0; }

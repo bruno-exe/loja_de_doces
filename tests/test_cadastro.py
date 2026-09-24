@@ -593,15 +593,53 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
         assert "Morango" in clean_page.text
         assert "Leite ninho" in clean_page.text
         assert "Comprando 3, ganhe R$ 4,00 de desconto." in clean_page.text
+        assert f'href="/produtos/{product.id}/editar"' in clean_page.text
+
+        edit_page = client.get(f"/produtos/{product.id}/editar")
+        assert edit_page.status_code == 200
+        assert "Editar produto" in edit_page.text
+        assert "A imagem atual será mantida" in edit_page.text
+        assert 'value="Brigadeiro especial"' in edit_page.text
+        replacement = BytesIO()
+        Image.new("RGB", (320, 240), "blue").save(replacement, "PNG")
+        edited = client.post(
+            f"/produtos/{product.id}/editar",
+            data={
+                "csrf": csrf_from(edit_page), "nome": "Brigadeiro premium",
+                "descricao": "Descrição atualizada", "valor": "8,25",
+                "quantidade_desconto": "4", "valor_desconto": "3,00",
+                "aceita_fiado": "true", "com_entrega": "true",
+                "subcategorias": ["Chocolate", "Abacaxi"], "focus_x": "0.4", "focus_y": "0.5",
+            },
+            files={"imagem": ("nova.png", replacement.getvalue(), "image/png")},
+            follow_redirects=False,
+        )
+        assert edited.status_code == 303
+        assert edited.headers["location"] == f"/produtos/{product.id}/editar?atualizado=1"
+        assert not image_path.exists()
+        with SessionLocal() as database:
+            updated_product = database.get(Produto, product.id)
+            updated_image_path = tmp_path / updated_product.imagem
+            assert updated_product.nome == "Brigadeiro premium"
+            assert updated_product.descricao == "Descrição atualizada"
+            assert updated_product.valor_centavos == 825
+            assert updated_product.quantidade_desconto == 4
+            assert updated_product.valor_desconto_centavos == 300
+            assert updated_product.aceita_fiado and updated_product.com_entrega
+            assert [(item.nome, item.ativo) for item in updated_product.variacoes] == [("Chocolate", True), ("Morango", False), ("Leite ninho", False), ("Abacaxi", True)]
+            assert updated_image_path.exists()
+        assert "Produto atualizado com sucesso!" in client.get(edited.headers["location"]).text
 
         updated_profile = client.get("/perfil")
         assert "1 produto cadastrado" in updated_profile.text
         assert 'href="/produtos/novo">Ver</a>' in updated_profile.text
 
         public_page = client.get(f"/vendedores/{seller.id}")
-        assert "Brigadeiro especial" in public_page.text
-        assert "Brigadeiro artesanal com chocolate." in public_page.text
-        assert "R$ 7,50" in public_page.text
+        assert "Brigadeiro premium" in public_page.text
+        assert "Descrição atualizada" in public_page.text
+        assert "R$ 8,25" in public_page.text
+        assert "Abacaxi" in public_page.text
+        assert "Morango" not in public_page.text
         assert "Doces cadastrados</dt><dd>1" in public_page.text
         assert "Excluir produto" not in public_page.text
 
@@ -613,6 +651,7 @@ def test_seller_creates_product_with_clean_form_and_default_options(tmp_path, mo
         assert deleted.status_code == 303
         assert deleted.headers["location"] == "/produtos/novo?excluido=1"
         assert not image_path.exists()
+        assert not updated_image_path.exists()
 
         with SessionLocal() as database:
             assert database.get(Produto, product.id) is None
@@ -748,6 +787,43 @@ def test_customer_buys_product_from_storefront() -> None:
             data={"csrf": csrf_from(own_storefront), "quantidade": "1"},
         )
         assert forbidden.status_code == 403
+
+
+def test_buyer_can_remove_complete_order_from_cart() -> None:
+    seller = create_test_user("remover-pedido-vendedor@teste.com", "vendedor")
+    buyer = create_test_user("remover-pedido-comprador@teste.com", "comprador")
+    outsider = create_test_user("remover-pedido-outro@teste.com", "comprador")
+    with SessionLocal() as database:
+        product = Produto(vendedor_id=seller.id, nome="Caixa variada", descricao="Teste", valor_centavos=500, imagem="caixa.webp")
+        product.variacoes = [VariacaoProduto(nome="Morango"), VariacaoProduto(nome="Chocolate")]
+        database.add(product)
+        database.flush()
+        first, second = [variation.id for variation in product.variacoes]
+        items = [
+            ItemCarrinho(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, variacao_id=first, quantidade=2),
+            ItemCarrinho(cliente_id=buyer.id, vendedor_id=seller.id, produto_id=product.id, variacao_id=second, quantidade=3),
+        ]
+        database.add_all(items)
+        database.commit()
+        anchor_id = items[0].id
+
+    with TestClient(app) as client:
+        client.post("/login", data={"csrf": csrf_from(client.get("/login")), "email": outsider.email, "senha": "senha-segura"})
+        page = client.get("/carrinho")
+        assert client.post(f"/carrinho/pedidos/{anchor_id}/remover", data={"csrf": csrf_from(page)}).status_code == 404
+
+    with TestClient(app) as client:
+        client.post("/login", data={"csrf": csrf_from(client.get("/login")), "email": buyer.email, "senha": "senha-segura"})
+        page = client.get("/carrinho")
+        assert "Retirar pedido do carrinho" in page.text
+        removed = client.post(f"/carrinho/pedidos/{anchor_id}/remover", data={"csrf": csrf_from(page)}, follow_redirects=False)
+        assert removed.status_code == 303
+        assert removed.headers["location"] == "/carrinho?pedido_removido=1"
+        result = client.get(removed.headers["location"])
+        assert "Pedido retirado do carrinho." in result.text
+        assert "Seu carrinho está vazio" in result.text
+    with SessionLocal() as database:
+        assert database.scalar(select(func.count(ItemCarrinho.id)).where(ItemCarrinho.cliente_id == buyer.id)) == 0
 
 
 def test_seller_can_deliver_and_cancel_only_own_sales() -> None:

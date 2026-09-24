@@ -7,6 +7,7 @@
           <button type="submit">Excluir produto</button>
         </form>
       {% endif %}
+      {% if can_edit_products %}<a class="edit-product-link" href="/produtos/{{ doce.id }}/editar">Editar</a>{% endif %}
       <img class="product-card-image" src="/uploads/products/{{ doce.imagem }}" alt="{{ doce.nome }}">
       <div class="product-card-content">
         <h3>{{ doce.nome }}</h3>

@@ -98,8 +98,8 @@
   });
 
   form.addEventListener("submit", (event) => {
-    if (!fileInput.files.length) { event.preventDefault(); status.textContent = "Escolha ou capture uma imagem antes de criar o produto."; return; }
+    if (form.dataset.imageRequired === "true" && !fileInput.files.length) { event.preventDefault(); status.textContent = "Escolha ou capture uma imagem antes de criar o produto."; return; }
     if (selectionMode && (!focusX.value || !focusY.value)) { event.preventDefault(); status.textContent = "Toque na imagem para definir o foco."; return; }
-    status.textContent = "Criando produto...";
+    status.textContent = form.dataset.imageRequired === "true" ? "Criando produto..." : "Salvando alterações...";
   });
 })();
